@@ -1,45 +1,89 @@
 import flet as ft
-# Assicurati che l'import corrisponda alla tua cartella (database o azure)
-from services.azure_db import get_workouts 
+from services.azure_db import get_workouts, delete_workout, analyze_workout_image, save_workout_async
+from services.ai_utils import parse_azure_result_to_json
+import time
 
 def schede_view(page: ft.Page):
     user_name = page.client_storage.get("username") or "Ospite"
-
-    # --- 1. RECUPERO DATI (Logica Backend) ---
     schede_db = get_workouts(user_name)
     
-    # Trasformiamo i dati grezzi del DB in oggetti per la grafica
-    schede_esistenti = []
-    if schede_db:
-        for s in schede_db:
-            esercizi_txt = [ex['name'] for ex in s.get("esercizi", [])]
-            # Anteprima testo (es. "Squat, Panca...")
-            descrizione = ", ".join(esercizi_txt) if esercizi_txt else "Nessun esercizio"
-            count_str = f"{len(esercizi_txt)} Esercizi"
+    # --- 1. SETUP AI & FILE PICKER (Invisibile ma necessario) ---
+    file_picker = ft.FilePicker()
+    page.overlay.append(file_picker) 
+    
+    loading_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Elaborazione AI in corso..."),
+        content=ft.Column([
+            ft.ProgressRing(),
+            ft.Text("Sto analizzando la foto con Azure, un attimo di pazienza."),
+        ], tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER, height=100),
+    )
 
-            schede_esistenti.append({
-                "titolo": s.get("nome_scheda", "Senza Nome"),
-                "tag": "Personalizzata",
-                "count": count_str,
-                "descrizione": descrizione
-            })
+#--- funzione per caricamento scheda da foto
 
-    # --- 2. FUNZIONI NAVIGAZIONE ---
-    def go_create(e):
-        page.go("/crea_scheda") 
+    def on_file_picked(e: ft.FilePickerResultEvent):
+        if not e.files: return 
+        page.dialog = loading_dialog
+        loading_dialog.open = True
+        page.update()
+        
+        try:
+            with open(e.files[0].path, "rb") as f:
+                res = analyze_workout_image(f.read())
+            
+            json_data = parse_azure_result_to_json(res, user_name)
+            
+            if json_data and json_data.get('esercizi'):
+                save_workout_async(json_data)
+                time.sleep(1.5) 
+                loading_dialog.open = False
+                page.open(ft.SnackBar(ft.Text("Scheda digitalizzata con successo!"), bgcolor="green"))
+                page.go("/") 
+                page.go("/schede")
+            else:
+                raise Exception("Non sono riuscito a leggere dati utili dalla foto.")
+                
+        except Exception as ex:
+            loading_dialog.open = False
+            page.open(ft.SnackBar(ft.Text(f"Errore: {str(ex)}"), bgcolor="red"))
+            page.update()
 
+    file_picker.on_result = on_file_picked
+
+    # --- 2. FUNZIONI DI AZIONE ---
+    
+    def open_detail(e, scheda_data):
+        """Apre la pagina di dettaglio salvando i dati in memoria"""
+        page.client_storage.set("scheda_selezionata", scheda_data)
+        page.go("/dettaglio")
+
+    def delete_click(e, w_id, card_ref):
+        """Elimina la scheda e nasconde la card"""
+        e.control.disabled = True # Evita doppi click accidentali
+        page.update()
+        
+        success = delete_workout(w_id, user_name)
+        if success:
+            card_ref.visible = False
+            page.update()
+            page.open(ft.SnackBar(ft.Text("Scheda eliminata correttamente!"), bgcolor="green"))
+        else:
+            e.control.disabled = False # Riabilita se fallisce
+            page.update()
+            page.open(ft.SnackBar(ft.Text("Errore: Impossibile eliminare la scheda."), bgcolor="red"))
+
+    # --- 3. NAVIGAZIONE ---
+    def go_create(e): page.go("/crea_scheda") 
     def nav_change(e):
         index = e.control.selected_index
-        if index == 0:
-            page.go("/")
-        elif index == 1:
-            pass 
-        elif index == 2:
-            page.go("/profilo")
+        if index == 0: page.go("/")
+        elif index == 1: pass 
+        elif index == 2: page.go("/profilo")
 
-    # --- 3. ELEMENTI GRAFICI ---
+    # --- 4. ELEMENTI GRAFICI (DESIGN ORIGINALE RIPRISTINATO) ---
     
-    # Bottone Nuova Scheda (Tuo stile originale con GLOW)
+    # Bottone Nuova Scheda (CON GLOW AZZURRO E ANIMAZIONE)
     btn_nuova = ft.Container(
         content=ft.Column([
             ft.Icon(ft.Icons.ADD, size=40, color=ft.Colors.WHITE),
@@ -49,12 +93,13 @@ def schede_view(page: ft.Page):
         height=120,
         bgcolor=ft.Colors.CYAN_600,
         border_radius=15,
+        # IL GLOW ORIGINALE:
         shadow=ft.BoxShadow(blur_radius=15, color=ft.Colors.CYAN_900, offset=ft.Offset(0,0)), 
         on_click=go_create, 
         animate=ft.Animation(300, "easeOut")
     )
 
-    # Bottone AI (Tuo stile originale)
+    # Bottone AI (CON BORDO VIOLA E SFONDO SCURO)
     btn_ai = ft.Container(
         content=ft.Column([
             ft.Icon(ft.Icons.CAMERA_ALT, size=30, color=ft.Colors.PURPLE_300),
@@ -63,83 +108,124 @@ def schede_view(page: ft.Page):
         width=160,
         height=120,
         bgcolor="#1e293b", 
-        border=ft.border.all(1, ft.Colors.PURPLE_900),
+        border=ft.border.all(1, ft.Colors.PURPLE_900), # IL BORDO ORIGINALE
         border_radius=15,
-        on_click=lambda e: page.open(ft.SnackBar(ft.Text("Funzione AI in arrivo!"))),
+        # AL CLICK APRE IL FILE PICKER
+        on_click=lambda e: file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE),
+    )
+
+    # BOTTONE: GENERATORE AI
+    btn_coach = ft.Container(
+        content=ft.Column([
+            ft.Icon(ft.Icons.AUTO_AWESOME, size=30, color=ft.Colors.PURPLE_300), # Icona scintille
+            ft.Text("Coach AI", weight=ft.FontWeight.BOLD, color=ft.Colors.PURPLE_200)
+        ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+        width=160,
+        height=120,
+        bgcolor="#1e293b", 
+        border=ft.border.all(1, ft.Colors.PURPLE_900), # Bordo Rosa
+        border_radius=15,
+        on_click=lambda e: page.go("/generatore"), # Vai alla nuova pagina
     )
 
     # Generazione Lista Card
     cards_widgets = []
     
-    if not schede_esistenti:
-        # Messaggio se vuoto
+    if not schede_db:
         cards_widgets.append(
-            ft.Container(
-                content=ft.Text("Non hai ancora schede salvate.", color="grey", italic=True),
-                padding=ft.padding.only(bottom=20)
-            )
+            ft.Container(content=ft.Text("Non hai ancora schede salvate.", color="grey", italic=True), padding=ft.padding.only(bottom=20))
         )
     else:
-        for scheda in schede_esistenti:
+        for scheda in schede_db: # Iteriamo direttamente sui dati DB
+            # Calcoli dati
+            esercizi_txt = []
+            for ex in scheda.get("esercizi", []):
+                nome_es = ex.get('name', ex.get('nome', 'Esercizio'))
+                esercizi_txt.append(nome_es)
+
+            descrizione = ", ".join(esercizi_txt) if esercizi_txt else "Nessun esercizio"
+            count_str = f"{len(esercizi_txt)} Esercizi"
+            w_id = scheda.get("id")
+            
+            # Stile Tag (Viola se AI, Blu se Manuale)
+            is_ai = scheda.get("ai_generated", False)
+            tag_text = "AI Scan/AI Generated" if is_ai else "Personalizzata"
+            tag_color = ft.Colors.PURPLE_200 if is_ai else ft.Colors.BLUE_200
+
+            # --- LA CARD (Container Cliccabile) ---
             card = ft.Container(
-                content=ft.Column([
-                    # Riga Titolo e Cestino
-                    ft.Row([
-                        ft.Text(scheda["titolo"], size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
-                        ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.GREY_500, tooltip="Elimina")
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                    
-                    # Riga Tag
-                    ft.Row([
-                        ft.Container(
-                            content=ft.Text(scheda["tag"], size=12, color=ft.Colors.BLUE_200),
-                            bgcolor="#334155", padding=5, border_radius=5
-                        ),
-                        ft.Text(scheda["count"], size=12, color=ft.Colors.GREY_500)
-                    ]),
-                    
-                    ft.Container(height=10),
-                    # Lista esercizi (max 2 righe)
-                    ft.Text(scheda["descrizione"], size=14, color=ft.Colors.BLUE_GREY_200, no_wrap=False, max_lines=2, overflow=ft.TextOverflow.ELLIPSIS)
-                ]),
-                bgcolor="#1e293b", 
+                bgcolor="#1e293b", # Slate 800
                 border_radius=15,
                 padding=20,
-                margin=ft.margin.only(bottom=10)
+                margin=ft.margin.only(bottom=10),
+                # RENDIAMO CLICCABILE TUTTA LA CARD PER APRIRE I DETTAGLI
+                on_click=lambda e, s=scheda: open_detail(e, s),
+                animate=ft.Animation(200, "easeOut") # Piccolo effetto visivo
             )
+
+            # Contenuto Card
+            card.content = ft.Column([
+                # Riga Titolo e Cestino
+                ft.Row([
+                    ft.Text(scheda.get("nome_scheda", "Senza Nome"), size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                    
+                    # Tasto Elimina (Blocchiamo la propagazione gestendo l'evento qui)
+                    ft.IconButton(
+                        ft.Icons.DELETE_OUTLINE, 
+                        icon_color=ft.Colors.RED_400, 
+                        tooltip="Elimina Scheda",
+                        on_click=lambda e, x=w_id, y=card: delete_click(e, x, y)
+                    )
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                
+                # Riga Tag e Contatore
+                ft.Row([
+                    ft.Container(
+                        content=ft.Text(tag_text, size=12, color=tag_color),
+                        bgcolor="#334155", padding=5, border_radius=5
+                    ),
+                    ft.Text(count_str, size=12, color=ft.Colors.GREY_500)
+                ]),
+                
+                ft.Container(height=10),
+                # Descrizione esercizi
+                ft.Text(descrizione, size=14, color=ft.Colors.BLUE_GREY_200, no_wrap=False, max_lines=2, overflow=ft.TextOverflow.ELLIPSIS)
+            ])
+            
             cards_widgets.append(card)
 
-    # --- 4. LAYOUT FINALE (HEADER FISSO + SCROLL) ---
+    # --- 5. LAYOUT FINALE (STRUTTURA FISSA + SCROLL) ---
     return ft.View(
         "/schede",
-        bgcolor="#0f172a",
-        padding=20, # Padding generale della pagina
+        bgcolor="#0f172a", 
+        padding=20, 
         controls=[
-            # A) HEADER FISSO
+            # HEADER FISSO
             ft.Container(
                 content=ft.Text("Le tue Schede", size=30, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
-                margin=ft.margin.only(bottom=10) # Spazio sotto il titolo
+                margin=ft.margin.only(bottom=10) 
             ),
             
-            # B) AREA SCROLLABILE (Contiene lista + bottoni)
+            # AREA SCROLLABILE
             ft.Column(
                 controls=[
-                    # Lista Cards (Spacchettata con *)
                     *cards_widgets,
                     
                     ft.Container(height=20),
-                    
-                    # Bottoni Azione (Scorrono insieme alle schede)
+
                     ft.Row([
                         btn_nuova,
                         ft.Container(width=10), 
-                        btn_ai
-                    ], alignment=ft.MainAxisAlignment.START),
+                        btn_ai,
+                        ft.Container(width=10),
+                        btn_coach # <--- Aggiunto qui
+                    ], alignment=ft.MainAxisAlignment.START, scroll=ft.ScrollMode.AUTO), # Scroll se non entrano
                     
-                    ft.Container(height=20) # Spazio extra in fondo per non tagliare l'ultimo elemento
+                    
+                    ft.Container(height=20) 
                 ],
-                scroll=ft.ScrollMode.AUTO, # Abilita lo scroll solo per questa colonna
-                expand=True                # Occupa tutto lo spazio rimanente sotto il titolo
+                scroll=ft.ScrollMode.AUTO, 
+                expand=True                
             )
         ],
         navigation_bar=ft.NavigationBar(

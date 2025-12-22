@@ -3,6 +3,8 @@ from pages.home import home_view
 from pages.onboarding import onboarding_view
 from pages.schede import schede_view          # <--- NUOVO IMPORT (Dashboard)
 from pages.crea_scheda import create_routine_view # <--- VECCHIO IMPORT (Form)
+from pages.dettaglio_scheda import dettaglio_view
+from pages.generatore_schede_ai import generator_view
 
 def main(page: ft.Page):
     page.title = "GymLog"
@@ -25,6 +27,14 @@ def main(page: ft.Page):
         # Rotta Form Creazione (Quella funzionale)
         elif page.route == "/crea_scheda":
             page.views.append(create_routine_view(page))
+
+        # Rotta dettaglio scheda (Quella funzionale)
+        elif page.route == "/dettaglio":
+            page.views.append(dettaglio_view(page))
+
+        # Rotta generatore scheda AI
+        elif page.route == "/generatore":
+            page.views.append(generator_view(page))
         
         page.update()
 
