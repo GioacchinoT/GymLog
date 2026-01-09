@@ -2,3 +2,5 @@ azure-functions
 azure-cosmos
 azure-identity          
 azure-keyvault-secrets
+azure-ai-formrecognizer
+openai

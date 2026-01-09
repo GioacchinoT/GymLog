@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-def parse_azure_result_to_json(azure_result, user_name):
+def parse_azure_result_to_json(azure_result, user_email):
     """
     Analizza il risultato JSON ricevuto dalla Azure Function.
     Adattato per lavorare con dizionari invece che oggetti SDK.
@@ -49,11 +49,11 @@ def parse_azure_result_to_json(azure_result, user_name):
 
             esercizi_estratti.append({
                 "id": str(uuid.uuid4())[:8],
-                "name": nome_pulito, 
+                "exercise_name": nome_pulito, 
                 "serie": info_pulita, 
                 "ripetizioni": "",
                 "is_custom": True,
-                "note_ai": "Tabella AI"
+                "note_ai": "Scanner AI"
             })
 
     # --- STRATEGIA 2: Fallback Linea per Linea ---
@@ -98,7 +98,7 @@ def parse_azure_result_to_json(azure_result, user_name):
 
     scheda_json = {
         "id": str(uuid.uuid4()),
-        "username": user_name,
+        "user_email": user_email,
         "type": "scheda",
         "nome_scheda": titolo,
         "split_type": "Smart Scan",

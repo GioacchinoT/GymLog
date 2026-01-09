@@ -1,10 +1,13 @@
-import flet as ft
+#import flet as ft
 from pages.home import home_view
 from pages.onboarding import onboarding_view
 from pages.schede import schede_view          # <--- NUOVO IMPORT (Dashboard)
 from pages.crea_scheda import create_routine_view # <--- VECCHIO IMPORT (Form)
 from pages.dettaglio_scheda import dettaglio_view
 from pages.generatore_schede_ai import generator_view
+from pages.storico_allenamento import workout_view
+from pages.start_allenamento import active_workout_view
+from pages.gestione_esercizi import gestione_esercizi_view
 
 def main(page: ft.Page):
     page.title = "GymLog"
@@ -36,6 +39,16 @@ def main(page: ft.Page):
         elif page.route == "/generatore":
             page.views.append(generator_view(page))
         
+# --- NUOVA ROTTA ALLENAMENTO ---
+        elif page.route == "/workout":
+            page.views.append(workout_view(page))
+
+        elif page.route == "/live_workout":
+            page.views.append(active_workout_view(page))
+
+        elif page.route == "/esercizi":
+            page.views.append(gestione_esercizi_view(page))
+        
         page.update()
 
     def view_pop(view):
@@ -46,11 +59,18 @@ def main(page: ft.Page):
     page.on_route_change = route_change
     page.on_view_pop = view_pop
 
-    username = page.client_storage.get("username")
-    if username:
+    user_email = page.client_storage.get("user_email")
+    
+    if user_email:
         page.go("/")
     else:
         page.go("/welcome")
 
 if __name__ == "__main__":
+    """ft.app(
+        target=main, 
+        view=ft.WEB_BROWSER, 
+        port=8080, 
+        host="0.0.0.0"  # <--- Questo è il comando magico
+    )"""
     ft.app(target=main)

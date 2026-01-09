@@ -1,0 +1,170 @@
+import flet as ft
+import threading
+from services.azure_db import get_schede, get_workout_logs
+
+def workout_view(page: ft.Page):
+    user_email = page.client_storage.get("user_email")
+    
+    # --- 1. CARICAMENTO STORICO (Background) ---
+    # MODIFICA: Usiamo ListView invece di Column per garantire lo scroll
+    # Aggiungiamo padding bottom=100 per non coprire l'ultimo elemento con il bottone INIZIA
+    history_column = ft.ListView(
+        spacing=10, 
+        expand=True, 
+        padding=ft.padding.only(left=0, top=0, right=10, bottom=100)
+    )
+    
+    loading_history = ft.ProgressRing(color=ft.Colors.CYAN_400)
+    
+    def show_log_details(log):
+        # Dialogo semplice per vedere i dettagli
+        details_txt = ""
+        for ex in log.get("dettagli_esercizi", []):
+            sets = ex.get("sets_performed", [])
+            # Trova la serie migliore (più kg o più reps)
+            if sets:
+                best_set = max([f"{s['kg']}kg x {s['reps']}" for s in sets], default="-")
+            else:
+                best_set = "-"
+            details_txt += f"• {ex['exercise_name']}: {len(sets)} serie (Best: {best_set})\n"
+
+        dlg = ft.AlertDialog(
+            title=ft.Text(f"{log.get('nome_scheda')} - {log.get('data')}"),
+            content=ft.Text(details_txt),
+            actions=[
+                ft.TextButton("Chiudi", on_click=lambda e: page.close(dlg))
+            ]
+        )
+        page.open(dlg)
+
+    def load_history():
+        logs = get_workout_logs(user_email)
+        history_column.controls.clear()
+        
+        if not logs:
+            history_column.controls.append(
+                ft.Container(content=ft.Text("Nessun allenamento completato.", color="grey", italic=True), alignment=ft.alignment.center, padding=20)
+            )
+        else:
+            for log in logs:
+                # Card Storico
+                card = ft.Container(
+                    content=ft.Row([
+                        ft.Column([
+                            ft.Text(log.get("nome_scheda", "Allenamento"), weight="bold", color="white", size=16),
+                            ft.Text(f"{log.get('data')} • {log.get('durata')}", color="grey", size=12)
+                        ]),
+                        ft.Icon(ft.Icons.CHEVRON_RIGHT, color="grey")
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    bgcolor="#1e293b",
+                    padding=15,
+                    border_radius=12,
+                    border=ft.border.all(1, "#334155"),
+                    on_click=lambda e, l=log: show_log_details(l)
+                )
+                history_column.controls.append(card)
+        
+        loading_history.visible = False
+        page.update()
+
+    threading.Thread(target=load_history, daemon=True).start()
+
+    # --- 2. SELETTORE SCHEDA PER NUOVO ALLENAMENTO ---
+    def start_workout(scheda):
+        page.client_storage.set("workout_active_scheda", scheda)
+        page.close(bs_schede)
+        page.go("/live_workout")
+
+    bs_schede_content = ft.Column(
+        scroll=ft.ScrollMode.AUTO, 
+        expand=True,
+        spacing=10
+    )
+    
+    bs_schede = ft.BottomSheet(
+        ft.Container(
+            content=bs_schede_content,
+            padding=20,
+            bgcolor="#1e293b",
+            border_radius=ft.border_radius.only(top_left=20, top_right=20),
+            height=500 
+        )
+    )
+
+    def open_start_dialog(e):
+        # Carichiamo le schede disponibili al volo
+        schede = get_schede(user_email)
+        bs_schede_content.controls.clear()
+        
+        # Header del BottomSheet
+        bs_schede_content.controls.append(
+            ft.Container(
+                content=ft.Text("Scegli la scheda", size=20, weight="bold", color="white"),
+                padding=ft.padding.only(bottom=10)
+            )
+        )
+        
+        if not schede:
+            bs_schede_content.controls.append(ft.Text("Nessuna scheda trovata. Creane una prima!", color="red"))
+        else:
+            for s in schede:
+                tile = ft.ListTile(
+                    leading=ft.Icon(ft.Icons.FITNESS_CENTER, color=ft.Colors.CYAN_400),
+                    title=ft.Text(s.get("nome_scheda"), color="white", weight="bold"),
+                    subtitle=ft.Text(f"{len(s.get('esercizi', []))} Esercizi", color="grey"),
+                    on_click=lambda e, x=s: start_workout(x),
+                    bgcolor="#0f172a",
+                    shape=ft.RoundedRectangleBorder(radius=10),
+                )
+                bs_schede_content.controls.append(tile)
+        
+        page.open(bs_schede)
+        page.update()
+
+
+    # --- 3. UI PRINCIPALE ---
+    def nav_change(e):
+        index = e.control.selected_index
+        if index == 0: page.go("/schede")
+        elif index == 1: page.go("/")
+        elif index == 2: pass 
+
+    return ft.View(
+        "/workout",
+        bgcolor="#0f172a",
+        padding=0, 
+        controls=[
+            ft.Container(
+                padding=20,
+                expand=True, # Espande il container principale
+                content=ft.Column([
+                    ft.Text("Storico Allenamenti", size=24, weight="bold", color="white"),
+                    loading_history,
+                    # MODIFICA: Inseriamo direttamente la ListView qui
+                    # Essendo ListView(expand=True) dentro una Column(expand=True), 
+                    # occuperà tutto lo spazio rimanente e attiverà lo scroll.
+                    history_column
+                ], expand=True) 
+            )
+        ],
+        floating_action_button=ft.FloatingActionButton(
+            icon=ft.Icons.PLAY_ARROW,
+            text="INIZIA",
+            bgcolor=ft.Colors.CYAN_600,
+            content=ft.Row([ft.Icon(ft.Icons.PLAY_ARROW), ft.Text("INIZIA", weight="bold")], alignment=ft.MainAxisAlignment.CENTER),
+            width=120,
+            on_click=open_start_dialog
+        ),
+        floating_action_button_location=ft.FloatingActionButtonLocation.CENTER_FLOAT,
+        navigation_bar=ft.NavigationBar(
+            destinations=[
+                ft.NavigationBarDestination(icon=ft.Icons.FOLDER_COPY, label="Schede"),
+                ft.NavigationBarDestination(icon=ft.Icons.HOME, label="Home"),
+                ft.NavigationBarDestination(icon=ft.Icons.SPORTS_GYMNASTICS, label="Allenamento"),
+            ],
+            bgcolor="#1e293b",
+            indicator_color=ft.Colors.BLUE_600,
+            selected_index=2,
+            on_change=nav_change
+        )
+    )

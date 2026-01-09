@@ -1,9 +1,9 @@
 import flet as ft
-from services.azure_db import generate_workout_ai, save_workout_async
+from services.azure_db import generate_workout_ai, save_scheda
 import time
 
 def generator_view(page: ft.Page):
-    user_name = page.client_storage.get("username") or "Atleta"
+    user_email = page.client_storage.get("user_email") or "Atleta"
 
     # --- INPUT USER ---
     txt_prompt = ft.TextField(
@@ -37,7 +37,7 @@ def generator_view(page: ft.Page):
         page.update()
 
         # 2. Chiamata Backend
-        scheda_json = generate_workout_ai(txt_prompt.value, user_name)
+        scheda_json = generate_workout_ai(txt_prompt.value, user_email)
 
         # 3. Gestione Risultato
         loading_anim.visible = False
@@ -45,7 +45,7 @@ def generator_view(page: ft.Page):
         
         if scheda_json:
             # Salviamo subito la scheda generata
-            save_workout_async(scheda_json)
+            save_scheda(scheda_json)
             
             page.open(ft.SnackBar(ft.Text("Scheda creata e salvata con successo!"), bgcolor="green"))
             time.sleep(1) # Un attimo per leggere

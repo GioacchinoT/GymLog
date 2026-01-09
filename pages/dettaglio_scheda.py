@@ -23,7 +23,7 @@ def dettaglio_view(page: ft.Page):
     else:
         for i, ex in enumerate(lista_esercizi):
             # Gestione nome (name vs nome)
-            nome_ex = ex.get("name", ex.get("nome", "Esercizio"))
+            nome_ex = ex.get("exercise_name", ex.get("nome", "Esercizio"))
             serie = ex.get("serie", "?")
             reps = ex.get("ripetizioni", "?")
             note = ex.get("note_ai", "") # Eventuali note dell'AI

@@ -1,10 +1,11 @@
 import flet as ft
 import uuid
 from datetime import datetime
-from services.azure_db import save_workout_async, get_all_exercises, add_custom_exercise_async
+from services.azure_db import save_scheda, get_exercise, add_custom_exercise
+
 
 def create_routine_view(page: ft.Page):
-    current_user = page.client_storage.get("username") or "Utente"
+    current_user = page.client_storage.get("user_email") or "Utente"
     
     # --- 1. CONTROLLO MODIFICA ---
     # Vediamo se c'è una scheda in "memoria" da modificare
@@ -15,8 +16,20 @@ def create_routine_view(page: ft.Page):
     exercises_buffer = scheda_da_modificare.get("esercizi", []) if is_editing else []
     
     # Caricamento catalogo esercizi
-    lista_esercizi_db = get_all_exercises()
+    lista_esercizi_db = get_exercise(current_user)
     if not lista_esercizi_db: lista_esercizi_db = ["Esercizio Generico"]
+
+    options_list = []
+    for ex in lista_esercizi_db:
+        # Gestiamo il caso in cui ex sia un dizionario (nuova logica) o stringa (fallback)
+        nome = ex.get("exercise_name") if isinstance(ex, dict) else ex
+        options_list.append(ft.dropdown.Option(nome))
+
+    dd_exist = ft.Dropdown(
+        label="Seleziona Esistente",
+        options=options_list, # Usiamo la lista corretta
+        bgcolor="#1e293b", border_color="#334155", color="white", width=250
+    )
 
     # --- UI COMPONENTS ---
     def styled_textfield(label, hint_text, initial_value=""):
@@ -69,12 +82,16 @@ def create_routine_view(page: ft.Page):
             return
 
         if sw_custom.value:
-            add_custom_exercise_async(ex_name)
+            add_custom_exercise(ex_name, current_user)
             dd_exist.options.append(ft.dropdown.Option(ex_name))
+
+
 
         new_ex = {
             "id": str(uuid.uuid4())[:8],
-            "name": ex_name,
+            "user_email": current_user,
+            "type": "esercizio_catalogo",
+            "exercise_name": ex_name,
             "serie": txt_sets.value,
             "ripetizioni": txt_reps.value,
             "is_custom": sw_custom.value
@@ -102,7 +119,7 @@ def create_routine_view(page: ft.Page):
     def update_exercises_list():
         exercises_column.controls.clear()
         for ex in exercises_buffer:
-            nome = ex.get('name', ex.get('nome', '???'))
+            nome = ex.get('exercise_name') or ex.get('name') or ex.get('nome') or '???'
             card = ft.Container(
                 content=ft.Row([
                     ft.Column([
@@ -118,7 +135,7 @@ def create_routine_view(page: ft.Page):
         page.update()
 
     # --- 3. SALVATAGGIO LOGICO (Insert o Update) ---
-    def save_scheda(e):
+    def salva_scheda_logico(e):
         title = txt_nome.controls[1].value
         split = txt_split.controls[1].value
         if not title:
@@ -128,7 +145,7 @@ def create_routine_view(page: ft.Page):
         payload = {
             # Se editiamo, manteniamo l'ID vecchio. Se nuova, ID nuovo.
             "id": scheda_da_modificare['id'] if is_editing else str(uuid.uuid4()),
-            "username": current_user,
+            "user_email": current_user,
             "type": "scheda",
             "nome_scheda": title,
             "split_type": split,
@@ -136,7 +153,7 @@ def create_routine_view(page: ft.Page):
             "esercizi": exercises_buffer
         }
         
-        save_workout_async(payload)
+        save_scheda(payload)
         
         # Pulizia della memoria di edit
         page.client_storage.remove("scheda_edit")
@@ -162,15 +179,17 @@ def create_routine_view(page: ft.Page):
 
     page_title_text = "Modifica Scheda" if is_editing else "Nuova Scheda"
 
+
     return ft.View(
         "/crea_scheda",
         bgcolor="#0f172a", padding=20,
         controls=[
+            # ... (contenuto identico a prima) ...
             ft.Row([
                 ft.IconButton(ft.Icons.ARROW_BACK_IOS, icon_color="white", on_click=go_back, icon_size=18),
                 ft.Text(page_title_text, size=20, weight="bold", color="white"),
                 ft.Container(expand=True),
-                ft.ElevatedButton("Salva", bgcolor=ft.Colors.BLUE_500, color="white", on_click=save_scheda)
+                ft.ElevatedButton("Salva", bgcolor=ft.Colors.BLUE_500, color="white", on_click=salva_scheda_logico)
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Divider(color="transparent", height=10),
             ft.Column(
@@ -184,14 +203,20 @@ def create_routine_view(page: ft.Page):
                 scroll=ft.ScrollMode.AUTO, expand=True
             )
         ],
-        # ... Navigation bar ...
         navigation_bar=ft.NavigationBar(
             destinations=[
+                # ORDINE: Schede - Home - Allenamento
+                ft.NavigationBarDestination(icon=ft.Icons.FOLDER_COPY, label="Schede"),
                 ft.NavigationBarDestination(icon=ft.Icons.HOME, label="Home"),
-                ft.NavigationBarDestination(icon=ft.Icons.FITNESS_CENTER, label="Schede"),
-                ft.NavigationBarDestination(icon=ft.Icons.PERSON, label="Profilo"),
+                ft.NavigationBarDestination(icon=ft.Icons.SPORTS_GYMNASTICS, label="Allenamento"),
             ],
-            bgcolor="#1e293b", indicator_color=ft.Colors.BLUE_600, selected_index=1,
-            on_change=lambda e: [page.client_storage.remove("scheda_edit"), page.go("/") if e.control.selected_index==0 else None]
+            bgcolor="#1e293b", indicator_color=ft.Colors.BLUE_600, 
+            selected_index=0, # Manteniamo evidenziato Schede
+            on_change=lambda e: [
+                page.client_storage.remove("scheda_edit"), 
+                page.go("/schede") if e.control.selected_index==0 else 
+                page.go("/") if e.control.selected_index==1 else 
+                page.go("/workout")
+            ]
         )
     )
