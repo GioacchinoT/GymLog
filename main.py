@@ -1,4 +1,4 @@
-#import flet as ft
+import flet as ft
 from pages.home import home_view
 from pages.onboarding import onboarding_view
 from pages.schede import schede_view          # <--- NUOVO IMPORT (Dashboard)
