@@ -62,7 +62,7 @@ def dettaglio_view(page: ft.Page):
     return ft.View(
         "/dettaglio",
         bgcolor="#0f172a", # Slate 900
-        padding=20,
+        padding=ft.padding.only(top=60, left=20, right=20, bottom=20),
         controls=[
             # Header con pulsante Indietro
             ft.Row([

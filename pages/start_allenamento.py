@@ -316,7 +316,7 @@ def active_workout_view(page: ft.Page):
     return ft.View(
         "/live_workout",
         bgcolor="#0f172a",
-        padding=20,
+        padding=ft.padding.only(top=60, left=20, right=20, bottom=20),
         controls=[
             header,
             exercises_ui_list,

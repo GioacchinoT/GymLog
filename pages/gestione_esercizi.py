@@ -117,7 +117,7 @@ def gestione_esercizi_view(page: ft.Page):
     view = ft.View(
         "/esercizi",
         bgcolor="#0f172a",
-        padding=20,
+        padding=ft.padding.only(top=60, left=20, right=20, bottom=20),
         controls=[
             # Header
             ft.Row([

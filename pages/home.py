@@ -270,7 +270,7 @@ def home_view(page: ft.Page):
     return ft.View(
         "/",
         bgcolor="#0f172a",
-        padding=20,
+        padding=ft.padding.only(top=60, left=20, right=20, bottom=20),
         scroll=ft.ScrollMode.AUTO, 
         controls=[
             header,

@@ -216,7 +216,7 @@ def schede_view(page: ft.Page):
     return ft.View(
         "/schede",
         bgcolor="#0f172a", 
-        padding=20, 
+        padding=ft.padding.only(top=60, left=20, right=20, bottom=20), 
         controls=[
             # 1. HEADER FISSO (Titolo + Pulsanti)
             # Questo Container NON ha expand, quindi occupa solo lo spazio che gli serve e resta in alto

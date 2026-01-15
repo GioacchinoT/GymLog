@@ -5,9 +5,9 @@ from services.azure_db import get_schede, get_workout_logs
 def workout_view(page: ft.Page):
     user_email = page.client_storage.get("user_email")
     
-    # --- 1. CARICAMENTO STORICO (Background) ---
-    # MODIFICA: Usiamo ListView invece di Column per garantire lo scroll
-    # Aggiungiamo padding bottom=100 per non coprire l'ultimo elemento con il bottone INIZIA
+    # --- 1. SETUP LISTA STORICO ---
+    # Usiamo ListView per garantire lo scroll fluido
+    # Padding bottom alto per evitare che l'ultimo elemento finisca sotto il tasto "INIZIA"
     history_column = ft.ListView(
         spacing=10, 
         expand=True, 
@@ -16,51 +16,58 @@ def workout_view(page: ft.Page):
     
     loading_history = ft.ProgressRing(color=ft.Colors.CYAN_400)
     
-    def show_log_details(log):
-        # Dialogo semplice per vedere i dettagli
-        details_txt = ""
-        for ex in log.get("dettagli_esercizi", []):
-            sets = ex.get("sets_performed", [])
-            # Trova la serie migliore (più kg o più reps)
-            if sets:
-                best_set = max([f"{s['kg']}kg x {s['reps']}" for s in sets], default="-")
-            else:
-                best_set = "-"
-            details_txt += f"• {ex['exercise_name']}: {len(sets)} serie (Best: {best_set})\n"
+    # --- 2. FUNZIONE NAVIGAZIONE DETTAGLIO (Nuova Logica) ---
+    def open_detail_page(e, log_data):
+        # Salviamo i dati e andiamo alla pagina di dettaglio
+        page.client_storage.set("allenamento_selezionato", log_data)
+        page.go("/dettaglio_allenamento")
 
-        dlg = ft.AlertDialog(
-            title=ft.Text(f"{log.get('nome_scheda')} - {log.get('data')}"),
-            content=ft.Text(details_txt),
-            actions=[
-                ft.TextButton("Chiudi", on_click=lambda e: page.close(dlg))
-            ]
-        )
-        page.open(dlg)
-
+    # --- 3. CARICAMENTO DATI STORICO (Background) ---
     def load_history():
         logs = get_workout_logs(user_email)
         history_column.controls.clear()
         
         if not logs:
             history_column.controls.append(
-                ft.Container(content=ft.Text("Nessun allenamento completato.", color="grey", italic=True), alignment=ft.alignment.center, padding=20)
+                ft.Container(
+                    content=ft.Text("Nessun allenamento completato.", color="grey", italic=True),
+                    alignment=ft.alignment.center,
+                    padding=20
+                )
             )
         else:
             for log in logs:
-                # Card Storico
+                # Dati per la card
+                nome = log.get("nome_scheda", "Allenamento")
+                data = log.get("data", "Senza data")
+                durata = log.get("durata", "--")
+                
+                # Card Cliccabile
                 card = ft.Container(
                     content=ft.Row([
                         ft.Column([
-                            ft.Text(log.get("nome_scheda", "Allenamento"), weight="bold", color="white", size=16),
-                            ft.Text(f"{log.get('data')} • {log.get('durata')}", color="grey", size=12)
-                        ]),
-                        ft.Icon(ft.Icons.CHEVRON_RIGHT, color="grey")
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                            ft.Text(nome, weight="bold", color="white", size=16),
+                            ft.Row([
+                                ft.Icon(ft.Icons.CALENDAR_TODAY, size=12, color="grey"),
+                                ft.Text(data, color="grey", size=12)
+                            ], spacing=5)
+                        ], expand=True),
+                        
+                        ft.Column([
+                            ft.Row([
+                                ft.Icon(ft.Icons.TIMER, size=12, color="grey"), 
+                                ft.Text(durata, color="grey", size=12)
+                            ]),
+                            ft.Text("Vedi dettagli >", color=ft.Colors.CYAN_400, size=11, weight="bold")
+                        ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.END)
+                    ]),
                     bgcolor="#1e293b",
                     padding=15,
-                    border_radius=12,
+                    border_radius=10,
                     border=ft.border.all(1, "#334155"),
-                    on_click=lambda e, l=log: show_log_details(l)
+                    # AL CLICK: Apre la pagina di dettaglio
+                    on_click=lambda e, x=log: open_detail_page(e, x),
+                    ink=True
                 )
                 history_column.controls.append(card)
         
@@ -69,17 +76,13 @@ def workout_view(page: ft.Page):
 
     threading.Thread(target=load_history, daemon=True).start()
 
-    # --- 2. SELETTORE SCHEDA PER NUOVO ALLENAMENTO ---
+    # --- 4. LOGICA TASTO "INIZIA" (Vecchio Codice) ---
     def start_workout(scheda):
         page.client_storage.set("workout_active_scheda", scheda)
         page.close(bs_schede)
         page.go("/live_workout")
 
-    bs_schede_content = ft.Column(
-        scroll=ft.ScrollMode.AUTO, 
-        expand=True,
-        spacing=10
-    )
+    bs_schede_content = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=10)
     
     bs_schede = ft.BottomSheet(
         ft.Container(
@@ -96,7 +99,6 @@ def workout_view(page: ft.Page):
         schede = get_schede(user_email)
         bs_schede_content.controls.clear()
         
-        # Header del BottomSheet
         bs_schede_content.controls.append(
             ft.Container(
                 content=ft.Text("Scegli la scheda", size=20, weight="bold", color="white"),
@@ -121,32 +123,35 @@ def workout_view(page: ft.Page):
         page.open(bs_schede)
         page.update()
 
-
-    # --- 3. UI PRINCIPALE ---
+    # --- 5. NAVIGAZIONE ---
     def nav_change(e):
         index = e.control.selected_index
         if index == 0: page.go("/schede")
         elif index == 1: page.go("/")
         elif index == 2: pass 
 
+    # --- 6. VIEW FINALE ---
     return ft.View(
         "/workout",
         bgcolor="#0f172a",
-        padding=0, 
+        padding=ft.padding.only(top=60, left=0, right=0, bottom=0), 
         controls=[
             ft.Container(
                 padding=20,
-                expand=True, # Espande il container principale
+                expand=True,
                 content=ft.Column([
-                    ft.Text("Storico Allenamenti", size=24, weight="bold", color="white"),
-                    loading_history,
-                    # MODIFICA: Inseriamo direttamente la ListView qui
-                    # Essendo ListView(expand=True) dentro una Column(expand=True), 
-                    # occuperà tutto lo spazio rimanente e attiverà lo scroll.
+                    ft.Text("Storico Allenamenti", size=28, weight=ft.FontWeight.BOLD, color="white"),
+                    ft.Divider(color="transparent", height=10),
+                    
+                    # Area caricamento
+                    ft.Row([loading_history], alignment=ft.MainAxisAlignment.CENTER),
+                    
+                    # Lista Storico
                     history_column
                 ], expand=True) 
             )
         ],
+        # IL TASTO FLUTTUANTE "INIZIA"
         floating_action_button=ft.FloatingActionButton(
             icon=ft.Icons.PLAY_ARROW,
             text="INIZIA",

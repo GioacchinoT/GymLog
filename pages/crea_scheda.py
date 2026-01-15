@@ -182,7 +182,8 @@ def create_routine_view(page: ft.Page):
 
     return ft.View(
         "/crea_scheda",
-        bgcolor="#0f172a", padding=20,
+        bgcolor="#0f172a", 
+        padding=ft.padding.only(top=60, left=20, right=20, bottom=20),
         controls=[
             # ... (contenuto identico a prima) ...
             ft.Row([

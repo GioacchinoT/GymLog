@@ -8,6 +8,12 @@ from pages.generatore_schede_ai import generator_view
 from pages.storico_allenamento import workout_view
 from pages.start_allenamento import active_workout_view
 from pages.gestione_esercizi import gestione_esercizi_view
+from pages.dettaglio_allenamento import dettaglio_allenamento_view
+import os
+
+os.environ["CURL_CA_BUNDLE"] = ""
+os.environ["REQUESTS_CA_BUNDLE"] = ""
+os.environ["SSL_CERT_FILE"] = ""
 
 def main(page: ft.Page):
     page.title = "GymLog"
@@ -20,6 +26,10 @@ def main(page: ft.Page):
         # --- GESTIONE ROTTE ---
         if page.route == "/":
             page.views.append(home_view(page))
+
+        #  -------------------- BYPASS AUTENTICAZIONE ---------------
+        #elif page.route == "/welcome":   
+            #page.views.append(home_view(page))
         elif page.route == "/welcome":
             page.views.append(onboarding_view(page))
         
@@ -39,7 +49,7 @@ def main(page: ft.Page):
         elif page.route == "/generatore":
             page.views.append(generator_view(page))
         
-# --- NUOVA ROTTA ALLENAMENTO ---
+        # --- NUOVA ROTTA ALLENAMENTO ---
         elif page.route == "/workout":
             page.views.append(workout_view(page))
 
@@ -49,6 +59,9 @@ def main(page: ft.Page):
         elif page.route == "/esercizi":
             page.views.append(gestione_esercizi_view(page))
         
+        if page.route == "/dettaglio_allenamento":
+            page.views.append(dettaglio_allenamento_view(page))
+
         page.update()
 
     def view_pop(view):
