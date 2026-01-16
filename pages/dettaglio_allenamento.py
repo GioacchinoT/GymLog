@@ -1,21 +1,20 @@
 import flet as ft
 
 def dettaglio_allenamento_view(page: ft.Page):
-    # 1. Recuperiamo i dati dalla memoria
+    # recuoero dati dalla memoria
     workout = page.client_storage.get("allenamento_selezionato")
     
-    # Safety Check: Se mancano i dati, torniamo allo storico
+    # se mancano i dati ritorna allo storico
     if not workout:
         page.go("/workout")
         return ft.View("/dettaglio_allenamento", controls=[])
 
-    # 2. Estrazione Dati
+    # estrazione dati
     nome_scheda = workout.get('nome_scheda', 'Allenamento')
     data_log = workout.get('data', 'Senza data') 
     durata = workout.get('durata', '--')
     esercizi_svolti = workout.get('dettagli_esercizi', [])
 
-    # 3. Header Card (Titolo Scheda, Data, Durata)
     header_info_card = ft.Container(
         content=ft.Column([
             ft.Text(nome_scheda, size=24, weight="bold", color=ft.Colors.CYAN_400),
@@ -34,7 +33,7 @@ def dettaglio_allenamento_view(page: ft.Page):
         border=ft.border.only(left=ft.border.BorderSide(5, ft.Colors.CYAN_400))
     )
 
-    # 4. Lista Esercizi
+    # lista esercizi
     exercises_column = ft.Column(spacing=15)
 
     if not esercizi_svolti:
@@ -56,7 +55,7 @@ def dettaglio_allenamento_view(page: ft.Page):
                     ], spacing=10)
                 )
 
-            # Righe delle serie
+            # righe delle serie
             for idx, s in enumerate(sets, 1):
                 kg = s.get('kg', '-')
                 reps = s.get('reps', '-')
@@ -68,7 +67,7 @@ def dettaglio_allenamento_view(page: ft.Page):
                     ], spacing=10)
                 )
 
-            # Card Esercizio
+            # box-card esercizio
             card = ft.Container(
                 content=ft.Column([
                     ft.Row([
@@ -88,12 +87,10 @@ def dettaglio_allenamento_view(page: ft.Page):
     return ft.View(
         "/dettaglio_allenamento",
         bgcolor="#0f172a",
-        # Usiamo padding standard, lo spazio superiore lo gestiamo nella Column
         padding=20, 
         controls=[
             ft.SafeArea(
                 ft.Column([
-                    # --- HEADER NAVIGAZIONE ALLINEATO ---
                     ft.Row([
                         ft.IconButton(
                             icon=ft.Icons.ARROW_BACK_IOS, 
@@ -107,14 +104,13 @@ def dettaglio_allenamento_view(page: ft.Page):
                     
                     ft.Divider(color="transparent", height=10),
                     
-                    # Contenuto scrollabile
                     ft.Column([
                         header_info_card,
                         ft.Divider(color="transparent", height=20),
                         ft.Text(f"ESERCIZI SVOLTI ({len(esercizi_svolti)})", size=14, weight="bold", color="#94a3b8"),
                         ft.Container(height=10),
                         exercises_column,
-                        ft.Container(height=20) # Spazio extra in fondo
+                        ft.Container(height=20) # spazio extra in fondo
                     ], scroll=ft.ScrollMode.AUTO, expand=True)
                     
                 ], expand=True),

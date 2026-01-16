@@ -1,25 +1,22 @@
 import flet as ft
 import time
 import threading
-# Assicurati che in azure_db.py tu abbia aggiornato delete_exercise_api per accettare 3 argomenti
 from services.azure_db import get_all_exercises_full, add_custom_exercise, delete_exercise_api
 
 def gestione_esercizi_view(page: ft.Page):
     user_email = page.client_storage.get("user_email")
     
-    # Lista scrollabile che conterrà le card
+    # lista scrollabile che contiene le card
     exercises_column = ft.Column(spacing=10)
     loading = ft.ProgressRing(color=ft.Colors.CYAN_400, visible=True)
 
-    # --- FUNZIONI ---
     
     def load_data():
         exercises_column.controls.clear()
         loading.visible = True
         page.update()
         
-        # Recupera dati dal backend
-        # Nota: questa funzione deve restituire la lista di oggetti dict dal DB
+        # recupera dati dal backend
         items = get_all_exercises_full(user_email)
         
         loading.visible = False
@@ -28,25 +25,21 @@ def gestione_esercizi_view(page: ft.Page):
             exercises_column.controls.append(ft.Text("Nessun esercizio trovato.", color="grey"))
         else:
             for item in items:
-                # --- FIX ROBUSTEZZA: Gestiamo sia Stringhe che Oggetti ---
+                # gestione str e dict
                 if isinstance(item, str):
-                    # Se arriva una stringa (vecchio backend), non abbiamo l'ID
                     ex_name = item
                     ex_id = None 
-                    owner = "system" # Assumiamo system se non sappiamo
+                    owner = "system" 
                     is_mine = False 
                 else:
-                    # Se arriva un dizionario (nuovo backend), prendiamo tutto
                     ex_name = item.get("exercise_name", "???")
                     ex_id = item.get("id")
                     owner = item.get("user_email")
                     
-                    # Posso cancellare solo se:
-                    # 1. L'email proprietaria coincide con la mia
-                    # 2. Ho un ID valido
+                    # si può cancellare solo se l'email proprietaria dell'esercizio è la mia e se ho un id valido
                     is_mine = (owner == user_email) and (ex_id is not None)
                 
-                # Card Esercizio
+                # card esercizio
                 card = ft.Container(
                     content=ft.Row([
                         ft.Row([
@@ -54,13 +47,12 @@ def gestione_esercizi_view(page: ft.Page):
                             ft.Text(ex_name, color="white", size=16, weight="bold"),
                         ]),
                         
-                        # Mostra cestino solo se è mio ED ho l'ID
+                        # mostra cestino solo se è mio ed ho l'id
                         ft.IconButton(
                             ft.Icons.DELETE_OUTLINE, 
                             icon_color="red", 
                             visible=is_mine,
                             tooltip="Elimina esercizio personale",
-                            # FONDAMENTALE: Passiamo ID, Email proprietario e NOME (Partition Key)
                             on_click=lambda e, x=ex_id, y=owner, z=ex_name: delete_click(x, y, z)
                         ) if is_mine else ft.Icon(ft.Icons.LOCK, color="#334155", size=16, tooltip="Sistema / Non modificabile")
                         
@@ -75,18 +67,15 @@ def gestione_esercizi_view(page: ft.Page):
 
     def delete_click(ex_id, owner_email, ex_name):
         if not ex_id: return
-        
-        # Chiama la funzione API passando tutti e 3 i parametri necessari per Cosmos DB
-        # (ID per trovare l'item, Nome per la Partition Key)
+
         delete_exercise_api(ex_id, owner_email, ex_name) 
         
         page.open(ft.SnackBar(ft.Text("Richiesta eliminazione inviata..."), bgcolor="orange"))
         
-        # Piccolo delay per dare tempo al server di processare e poi ricarichiamo
         time.sleep(0.5) 
         load_data()
 
-    # --- DIALOG AGGIUNTA ---
+    # --- DIALOG ---
     txt_new_name = ft.TextField(
         label="Nome Esercizio", 
         bgcolor="#1e293b", 
@@ -113,13 +102,13 @@ def gestione_esercizi_view(page: ft.Page):
         ]
     )
 
-    # --- UI LAYOUT ---
+    # UI 
     view = ft.View(
         "/esercizi",
         bgcolor="#0f172a",
         padding=ft.padding.only(top=60, left=20, right=20, bottom=20),
         controls=[
-            # Header
+            # header
             ft.Row([
                 ft.IconButton(ft.Icons.ARROW_BACK_IOS, icon_color="white", on_click=lambda e: page.go("/schede")),
                 ft.Text("Gestione Esercizi", size=24, weight="bold", color="white")
@@ -127,7 +116,7 @@ def gestione_esercizi_view(page: ft.Page):
             
             ft.Divider(color="transparent", height=20),
             
-            # Pulsante Aggiungi Grande
+            # pulsante aggiungi
             ft.Container(
                 content=ft.Row([
                     ft.Icon(ft.Icons.ADD_CIRCLE, color="white"),
@@ -142,17 +131,16 @@ def gestione_esercizi_view(page: ft.Page):
             ft.Divider(color="transparent", height=20),
             loading,
             
-            # Lista Esercizi
+            # lista esercizi
             ft.Container(
                 content=exercises_column,
-                expand=True, # Occupa tutto lo spazio rimanente
-                # IMPORTANTE: scroll deve essere gestito qui o dentro la Column
+                expand=True, 
             )
         ],
         scroll=ft.ScrollMode.AUTO
     )
     
-    # Carica i dati appena la vista viene creata
+    #carica i dati appena la vista viene creata
     threading.Thread(target=load_data, daemon=True).start()
     
     return view

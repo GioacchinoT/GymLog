@@ -7,7 +7,7 @@ API_URL = "https://gymlog-backend-gchnc4f6b6c5grc7.northeurope-01.azurewebsites.
 
 def get_remote_config():
     try:
-        response = requests.get(f"{API_URL}/get_auth_config", timeout=10)
+        response = requests.get(f"{API_URL}/get_auth_config", timeout=20)
         if response.status_code == 200:
             return response.json()
     except Exception as e:
@@ -16,7 +16,7 @@ def get_remote_config():
 
 def login_microsoft(ui_callback=None):
 
-    # 1. Configurazione
+    # configurazione
     config = get_remote_config()
     if not config: return None
 
@@ -26,28 +26,26 @@ def login_microsoft(ui_callback=None):
 
     app = msal.PublicClientApplication(client_id=client_id, authority=authority)
     
-    # 2. Tentativo Silent (se c'è già un token in cache)
+    # tentativo silent (controllo se c'è già un token in cache)
     accounts = app.get_accounts()
     if accounts:
         result = app.acquire_token_silent(scopes, account=accounts[0])
         if result: return parse_user_data(result)
 
-    # 3. Device Code Flow (Il metodo sicuro per Android)
+    # Device Code Flow (per android)
     try:
-        # Chiediamo a Microsoft un codice per il dispositivo
+        # richiesta a microsoft un codice per il dispositivo
         flow = app.initiate_device_flow(scopes=scopes)
         
         if "user_code" not in flow:
             print("Errore: Nessun user_code nel flusso")
             return None
 
-        # --- AGGIORNIAMO LA GRAFICA ---
-        # Passiamo il codice e l'URL alla pagina Flet per mostrarli all'utente
+        # aggiornamento grafica - passaggio del codice e url all'UI
         if ui_callback:
             ui_callback(flow["user_code"], flow["verification_uri"])
         
-        # --- ATTESA ---
-        # Questa funzione BLOCCA l'esecuzione finché l'utente non conferma sul browser
+        # blocco dell'esecuzione in attesa del login
         print("In attesa che l'utente inserisca il codice nel browser...")
         result = app.acquire_token_by_device_flow(flow)
         

@@ -26,10 +26,7 @@ def main(page: ft.Page):
         # --- GESTIONE ROTTE ---
         if page.route == "/":
             page.views.append(home_view(page))
-
-        #  -------------------- BYPASS AUTENTICAZIONE ---------------
-        #elif page.route == "/welcome":   
-            #page.views.append(home_view(page))
+            
         elif page.route == "/welcome":
             page.views.append(onboarding_view(page))
         
@@ -53,12 +50,15 @@ def main(page: ft.Page):
         elif page.route == "/workout":
             page.views.append(workout_view(page))
 
+        # --- START ALLENAMENTO ---
         elif page.route == "/live_workout":
             page.views.append(active_workout_view(page))
 
+        # --- GEESTIONE ESERCIZI ---
         elif page.route == "/esercizi":
             page.views.append(gestione_esercizi_view(page))
         
+        # --- DETTAGLIO ALLENAMENTO ---
         if page.route == "/dettaglio_allenamento":
             page.views.append(dettaglio_allenamento_view(page))
 
@@ -84,6 +84,6 @@ if __name__ == "__main__":
         target=main, 
         view=ft.WEB_BROWSER, 
         port=8080, 
-        host="0.0.0.0"  # <--- Questo è il comando magico
+        host="0.0.0.0" 
     )"""
-    ft.app(target=main)
+    ft.app(target=main, assets_dir="assets")

@@ -5,9 +5,7 @@ from services.azure_db import get_schede, get_workout_logs
 def workout_view(page: ft.Page):
     user_email = page.client_storage.get("user_email")
     
-    # --- 1. SETUP LISTA STORICO ---
-    # Usiamo ListView per garantire lo scroll fluido
-    # Padding bottom alto per evitare che l'ultimo elemento finisca sotto il tasto "INIZIA"
+    # lista storico
     history_column = ft.ListView(
         spacing=10, 
         expand=True, 
@@ -16,13 +14,12 @@ def workout_view(page: ft.Page):
     
     loading_history = ft.ProgressRing(color=ft.Colors.CYAN_400)
     
-    # --- 2. FUNZIONE NAVIGAZIONE DETTAGLIO (Nuova Logica) ---
     def open_detail_page(e, log_data):
-        # Salviamo i dati e andiamo alla pagina di dettaglio
+        # salvataggio dati e routing verso pagina di dettaglio
         page.client_storage.set("allenamento_selezionato", log_data)
         page.go("/dettaglio_allenamento")
 
-    # --- 3. CARICAMENTO DATI STORICO (Background) ---
+    # CARICAMENTO DATI STORICO 
     def load_history():
         logs = get_workout_logs(user_email)
         history_column.controls.clear()
@@ -37,12 +34,12 @@ def workout_view(page: ft.Page):
             )
         else:
             for log in logs:
-                # Dati per la card
+                # dati per la card
                 nome = log.get("nome_scheda", "Allenamento")
                 data = log.get("data", "Senza data")
                 durata = log.get("durata", "--")
                 
-                # Card Cliccabile
+                # card allenamento cliccabile
                 card = ft.Container(
                     content=ft.Row([
                         ft.Column([
@@ -65,7 +62,7 @@ def workout_view(page: ft.Page):
                     padding=15,
                     border_radius=10,
                     border=ft.border.all(1, "#334155"),
-                    # AL CLICK: Apre la pagina di dettaglio
+
                     on_click=lambda e, x=log: open_detail_page(e, x),
                     ink=True
                 )
@@ -76,7 +73,7 @@ def workout_view(page: ft.Page):
 
     threading.Thread(target=load_history, daemon=True).start()
 
-    # --- 4. LOGICA TASTO "INIZIA" (Vecchio Codice) ---
+    # LOGICA BTN INIZIA
     def start_workout(scheda):
         page.client_storage.set("workout_active_scheda", scheda)
         page.close(bs_schede)
@@ -95,7 +92,7 @@ def workout_view(page: ft.Page):
     )
 
     def open_start_dialog(e):
-        # Carichiamo le schede disponibili al volo
+        #caricamento lista schede disponibili per allneamento
         schede = get_schede(user_email)
         bs_schede_content.controls.clear()
         
@@ -123,14 +120,14 @@ def workout_view(page: ft.Page):
         page.open(bs_schede)
         page.update()
 
-    # --- 5. NAVIGAZIONE ---
+
     def nav_change(e):
         index = e.control.selected_index
         if index == 0: page.go("/schede")
         elif index == 1: page.go("/")
         elif index == 2: pass 
 
-    # --- 6. VIEW FINALE ---
+    # UI 
     return ft.View(
         "/workout",
         bgcolor="#0f172a",
@@ -143,15 +140,13 @@ def workout_view(page: ft.Page):
                     ft.Text("Storico Allenamenti", size=28, weight=ft.FontWeight.BOLD, color="white"),
                     ft.Divider(color="transparent", height=10),
                     
-                    # Area caricamento
                     ft.Row([loading_history], alignment=ft.MainAxisAlignment.CENTER),
                     
-                    # Lista Storico
                     history_column
                 ], expand=True) 
             )
         ],
-        # IL TASTO FLUTTUANTE "INIZIA"
+
         floating_action_button=ft.FloatingActionButton(
             icon=ft.Icons.PLAY_ARROW,
             text="INIZIA",

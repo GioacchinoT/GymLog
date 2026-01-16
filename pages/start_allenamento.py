@@ -5,7 +5,8 @@ from datetime import datetime
 from services.azure_db import save_workout_log_blocking, get_workout_logs
 
 def active_workout_view(page: ft.Page):
-    # Recuperiamo la scheda scelta e l'utente
+
+    #recupero scheda scelta per allenamento
     scheda_source = page.client_storage.get("workout_active_scheda")
     user_email = page.client_storage.get("user_email")
 
@@ -13,30 +14,26 @@ def active_workout_view(page: ft.Page):
         page.go("/workout")
         return ft.View("/live_workout", controls=[])
 
-    # --- 0. RECUPERO DATI PRECEDENTI (GHOST VALUES) ---
-    # Scarichiamo lo storico per trovare i carichi usati l'ultima volta
-    history_map = {} # Struttura: {"nome esercizio standardizzato": [{"kg": 50, "reps": 10}, ...]}
+    # recupero dati del vecchio allenamento 
+    history_map = {} 
     
     try:
         logs = get_workout_logs(user_email)
         if logs:
-            print(f"📊 [DEBUG] Trovati {len(logs)} allenamenti nello storico.")
+            print(f"[DEBUG] Trovati {len(logs)} allenamenti nello storico")
             for log in logs:
                 for details in log.get("dettagli_esercizi", []):
                     raw_name = details.get("exercise_name", "")
-                    # Standardizziamo il nome (minuscolo e senza spazi extra) per la ricerca
                     clean_name = raw_name.strip().lower()
                     
-                    # Se non abbiamo ancora salvato questo esercizio (ed è il più recente), salviamolo
+                    # salvataggio esercizio svolto
                     if clean_name and clean_name not in history_map:
                         history_map[clean_name] = details.get("sets_performed", [])
-                        # Print di debug per capire cosa sta caricando
-                        # print(f"   Note: Trovato storico per '{raw_name}': {history_map[clean_name]}")
     except Exception as e:
-        print(f"❌ Errore recupero storico per ghost values: {e}")
+        print(f"XXX Errore recupero storico per ghost values: {e}")
 
 
-    # --- 1. STATO DEL TIMER ---
+    # timer
     start_time = time.time()
     timer_running = True
     txt_timer = ft.Text("00:00", size=35, weight="bold", color=ft.Colors.CYAN_400, font_family="Consolas, monospace")
@@ -54,14 +51,14 @@ def active_workout_view(page: ft.Page):
 
     threading.Thread(target=update_timer, daemon=True).start()
 
-    # --- 2. STRUTTURA DATI & LOGICA ---
+    # struttura dati
     exercises_data = {} 
     btn_termina = ft.ElevatedButton("TERMINA ALLENAMENTO", bgcolor=ft.Colors.RED_600, color="white", height=50, width=200)
 
     def finish_workout(e):
         nonlocal timer_running
         
-        # Feedback visivo
+        # feedback visivo
         btn_termina.text = "SALVATAGGIO..."
         btn_termina.disabled = True
         btn_termina.bgcolor = ft.Colors.GREY_700
@@ -69,14 +66,14 @@ def active_workout_view(page: ft.Page):
 
         timer_running = False
         
-        # Calcolo Durata
+        # calcolo durata
         elapsed_seconds = int(time.time() - start_time)
         mins, secs = divmod(elapsed_seconds, 60)
         final_duration = f"{mins}m {secs}s"
         
         log_exercises = []
         
-        # Raccolta dati dagli input
+        # raccolta dati dagli input
         for i, ex_original in enumerate(scheda_source.get("esercizi", [])):
             sets_done = []
             input_rows = exercises_data.get(i, [])
@@ -85,7 +82,7 @@ def active_workout_view(page: ft.Page):
                 kg_val = row_refs["kg"].current.value
                 reps_val = row_refs["reps"].current.value
                 
-                # Salviamo solo se c'è almeno un dato (anche parziale)
+                # salvataggio solo se c'è almeno un dato 
                 if kg_val or reps_val:
                     sets_done.append({"kg": kg_val or "0", "reps": reps_val or "0"})
             
@@ -119,30 +116,27 @@ def active_workout_view(page: ft.Page):
     btn_termina.on_click = finish_workout
 
 
-    # --- 3. COSTRUZIONE UI LISTA ESERCIZI ---
+    # costruzione UI lista esercizi
     exercises_ui_list = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=25)
 
     for i, ex in enumerate(scheda_source.get("esercizi", [])):
         nome_ex = ex.get("exercise_name") or ex.get("nome", "Esercizio")
         target_reps = ex.get("ripetizioni", "8-10") 
         
-        # Recuperiamo lo storico usando la chiave normalizzata
+        #recupero storico esercizio
         clean_nome_ex = nome_ex.strip().lower()
         prev_sets = history_map.get(clean_nome_ex, [])
-        
-        # Debug per capire se trova la chiave
-        # if prev_sets: print(f"   [UI] Caricati ghost values per {nome_ex}: {len(prev_sets)} serie")
         
         sets_column = ft.Column(spacing=8)
         exercises_data[i] = [] 
 
-        # Funzione per aggiungere riga
+        # funzione per aggiungere righe/serie
         def add_set_row(e, ex_idx=i, container=sets_column, default_target=target_reps, history_list=prev_sets):
-            # Indice della serie
+
             current_set_idx = len(exercises_data[ex_idx])
             display_num = current_set_idx + 1
             
-            # Cerchiamo i dati "Ghost" (dallo storico)
+            # ricerca i dati ghost dallo storico
             ghost_kg = ""
             ghost_reps = ""
             if current_set_idx < len(history_list):
@@ -150,23 +144,22 @@ def active_workout_view(page: ft.Page):
                 val_kg = str(prev_data.get("kg", ""))
                 val_reps = str(prev_data.get("reps", ""))
                 
-                # Mostriamo il ghost value se esiste
                 if val_kg and val_kg != "0": ghost_kg = val_kg
                 if val_reps and val_reps != "0": ghost_reps = val_reps
 
             ref_kg = ft.Ref[ft.TextField]()
             ref_reps = ft.Ref[ft.TextField]()
             
-            # UI Stato (Check button)
+            # check btn
             def toggle_check(e):
                 is_checked = e.control.icon == ft.Icons.CHECK_CIRCLE
                 if is_checked:
-                    # Uncheck
+                    # uncheck
                     e.control.icon = ft.Icons.RADIO_BUTTON_UNCHECKED
                     e.control.icon_color = "grey"
                     row_container.bgcolor = "#1e293b" 
                 else:
-                    # Check
+                    # check
                     e.control.icon = ft.Icons.CHECK_CIRCLE
                     e.control.icon_color = ft.Colors.GREEN_400
                     row_container.bgcolor = "#14532d" 
@@ -179,11 +172,10 @@ def active_workout_view(page: ft.Page):
                 on_click=toggle_check
             )
 
-            # Campi Input (Stile Minimal + WHITE24)
             txt_kg = ft.TextField(
                 ref=ref_kg,
                 hint_text=ghost_kg if ghost_kg else "Kg",
-                # TORNIAMO A WHITE24 COME RICHIESTO
+                
                 hint_style=ft.TextStyle(color=ft.Colors.WHITE24), 
                 width=80, 
                 bgcolor=ft.Colors.BLACK12, 
@@ -197,7 +189,7 @@ def active_workout_view(page: ft.Page):
             txt_reps = ft.TextField(
                 ref=ref_reps, 
                 hint_text=ghost_reps if ghost_reps else default_target, 
-                # TORNIAMO A WHITE24 COME RICHIESTO
+                
                 hint_style=ft.TextStyle(color=ft.Colors.WHITE24),
                 width=80, 
                 bgcolor=ft.Colors.BLACK12,
@@ -247,7 +239,7 @@ def active_workout_view(page: ft.Page):
         for _ in range(num_series):
             add_set_row(None)
 
-        # --- CARD ESERCIZIO ---
+        #card esercizio
         last_log_str = "Primo Allenamento"
         if prev_sets:
             s1 = prev_sets[0]
@@ -260,7 +252,6 @@ def active_workout_view(page: ft.Page):
 
         ex_card = ft.Container(
             content=ft.Column([
-                # Intestazione Card
                 ft.Row([
                     ft.Column([
                         ft.Text(nome_ex, size=18, weight="bold", color="white"),
@@ -273,7 +264,6 @@ def active_workout_view(page: ft.Page):
                 
                 ft.Divider(color="transparent", height=10),
                 
-                # Intestazione Colonne
                 ft.Row([
                     ft.Text("SET", width=30, text_align="center", color="#64748b", size=11, weight="bold"),
                     ft.Text("KG", width=80, text_align="center", color="#64748b", size=11, weight="bold"),
@@ -301,7 +291,6 @@ def active_workout_view(page: ft.Page):
         exercises_ui_list.controls.append(ex_card)
 
 
-    # --- HEADER ---
     header = ft.Container(
         content=ft.Column([
             ft.Text(scheda_source.get("nome_scheda", "Allenamento").upper(), size=16, color="grey", weight="bold"),

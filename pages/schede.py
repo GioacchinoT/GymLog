@@ -7,14 +7,14 @@ import threading
 def schede_view(page: ft.Page):
     user_email = page.client_storage.get("user_email") 
     
-    # --- CONTENITORI DATI ---
+    # contenitore dati
     cards_column = ft.Column(spacing=0) 
     
     loading_widget = ft.Row([
         ft.ProgressRing(color=ft.Colors.CYAN_400),
     ], alignment=ft.MainAxisAlignment.CENTER, visible=True)
 
-    # --- 1. SETUP AI & FILE PICKER ---
+    # file picker per scansione ai
     file_picker = ft.FilePicker()
     page.overlay.append(file_picker) 
     
@@ -23,7 +23,7 @@ def schede_view(page: ft.Page):
         title=ft.Text("Elaborazione AI in corso..."),
         content=ft.Column([
             ft.ProgressRing(),
-            ft.Text("Sto analizzando la foto con Azure, un attimo di pazienza."),
+            ft.Text("Sto analizzando la foto con Azure..."),
         ], tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER, height=100),
     )
 
@@ -56,7 +56,7 @@ def schede_view(page: ft.Page):
 
     file_picker.on_result = on_file_picked
 
-    # --- 2. FUNZIONI DI AZIONE ---
+    # funzione di azioni
     def open_detail(e, scheda_data):
         page.client_storage.set("scheda_selezionata", scheda_data)
         page.go("/dettaglio")
@@ -74,13 +74,12 @@ def schede_view(page: ft.Page):
             e.control.disabled = False 
             page.update()
             page.open(ft.SnackBar(ft.Text("Errore: Impossibile eliminare la scheda."), bgcolor="red"))
-
-    # --- 3. NAVIGAZIONE ---
+ 
     def go_create(e): page.go("/crea_scheda") 
 
-    # --- 4. ELEMENTI GRAFICI (PULSANTI ORIGINALI) ---
-    # Ripristinati esattamente come nel tuo file originale e nello screenshot
+    # elementi UI btn
     
+    # nuova scheda
     btn_nuova = ft.Container(
         content=ft.Column([
             ft.Icon(ft.Icons.ADD, size=40, color=ft.Colors.WHITE),
@@ -94,6 +93,7 @@ def schede_view(page: ft.Page):
         animate=ft.Animation(300, "easeOut")
     )
 
+    # scansione
     btn_ai = ft.Container(
         content=ft.Column([
             ft.Icon(ft.Icons.CAMERA_ALT, size=30, color=ft.Colors.PURPLE_300),
@@ -106,6 +106,7 @@ def schede_view(page: ft.Page):
         on_click=lambda e: file_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE),
     )
 
+    #coach ai 
     btn_coach = ft.Container(
         content=ft.Column([
             ft.Icon(ft.Icons.AUTO_AWESOME, size=30, color=ft.Colors.PURPLE_300),
@@ -118,7 +119,7 @@ def schede_view(page: ft.Page):
         on_click=lambda e: page.go("/generatore"),
     )
 
-    # --- NUOVO BOTTONE GESTISCI ESERCIZI ---
+    # btn gestione esercizi
     btn_gestisci = ft.Container(
         content=ft.Column([
             ft.Icon(ft.Icons.LIST_ALT, size=30, color=ft.Colors.CYAN_600),
@@ -132,13 +133,11 @@ def schede_view(page: ft.Page):
         on_click=lambda e: page.go("/esercizi"),
     )
 
-    # Container dei pulsanti (FISSO IN ALTO)
-    # ScrollMode.HIDDEN o AUTO permette di scrollare orizzontalmente su schermi piccoli
-    # ma mantiene le dimensioni fisse dei bottoni.
+    # container dei pulsanti 
     actions_row = ft.Row(
         [
             btn_nuova,
-            ft.Container(width=10), # Spaziatore manuale come nell'originale
+            ft.Container(width=10), 
             btn_ai,
             ft.Container(width=10),
             btn_coach,
@@ -149,7 +148,7 @@ def schede_view(page: ft.Page):
         scroll=ft.ScrollMode.AUTO 
     )
 
-    # --- LOGICA GENERAZIONE CARD IN BACKGROUND ---
+    # caricamento lista schede in background
     def background_loader():
         schede_db = get_schede(user_email)
         new_controls = []
@@ -184,7 +183,15 @@ def schede_view(page: ft.Page):
 
                 card.content = ft.Column([
                     ft.Row([
-                        ft.Text(scheda.get("nome_scheda", "Senza Nome"), size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                        ft.Text(
+                            scheda.get("nome_scheda", "Senza Nome"), 
+                            size=20, 
+                            weight=ft.FontWeight.BOLD, 
+                            color=ft.Colors.WHITE,
+                            expand=True,           
+                            max_lines=2,           
+                            overflow=ft.TextOverflow.ELLIPSIS 
+                        ),
                         ft.IconButton(
                             ft.Icons.DELETE_OUTLINE, icon_color=ft.Colors.RED_400, tooltip="Elimina Scheda",
                             on_click=lambda e, x=w_id, y=card: delete_click(e, x, y)
@@ -205,43 +212,39 @@ def schede_view(page: ft.Page):
 
     threading.Thread(target=background_loader, daemon=True).start()
 
-    # --- NAVIGAZIONE ---
+ 
     def nav_change(e):
         index = e.control.selected_index
         if index == 0: pass
         elif index == 1: page.go("/")
         elif index == 2: page.go("/workout")
 
-    # --- 5. LAYOUT FINALE ---
+    #  UI 
     return ft.View(
         "/schede",
         bgcolor="#0f172a", 
         padding=ft.padding.only(top=60, left=20, right=20, bottom=20), 
         controls=[
-            # 1. HEADER FISSO (Titolo + Pulsanti)
-            # Questo Container NON ha expand, quindi occupa solo lo spazio che gli serve e resta in alto
             ft.Column([
                 ft.Container(
                     content=ft.Text("Le tue Schede", size=30, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
                     margin=ft.margin.only(bottom=20) 
                 ),
-                actions_row, # I pulsanti sono qui, fissi
+                actions_row, 
                 ft.Divider(color="transparent", height=20),
             ], spacing=0),
             
-            # 2. LISTA SCORREVOLE
-            # Questo Container ha expand=True, quindi riempie tutto il resto dello schermo
-            # e abilita lo scroll al suo interno.
+
             ft.Container(
                 content=ft.Column(
                     controls=[
                         loading_widget,
-                        cards_column, # Le schede verranno caricate qui
-                        ft.Container(height=50) # Spazio extra in fondo per scroll comodo
+                        cards_column, 
+                        ft.Container(height=50)
                     ],
-                    scroll=ft.ScrollMode.AUTO, # SCROLL ATTIVO SOLO QUI
+                    scroll=ft.ScrollMode.AUTO,
                 ),
-                expand=True # FONDAMENTALE: spinge la lista a occupare lo spazio rimanente
+                expand=True 
             )
         ],
         navigation_bar=ft.NavigationBar(

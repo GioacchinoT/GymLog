@@ -3,7 +3,7 @@ import threading
 from services.azure_db import get_schede, update_user, get_user_data
 
 def home_view(page: ft.Page):
-    # --- 1. RECUPERO DATI UTENTE ---
+    # recupero dati utente
     user_email = page.client_storage.get("user_email")
     user_name = page.client_storage.get("user_name") 
     user_oid = page.client_storage.get("oid")
@@ -16,37 +16,35 @@ def home_view(page: ft.Page):
     cached_height = page.client_storage.get("user_height")
     cached_age = page.client_storage.get("user_age")
 
-    # Variabili che useremo nella pagina
+    # variabili utente
     user_weight = cached_weight
     user_height = cached_height
     user_age = cached_age
 
-    # B. Se la cache è vuota (es. primo accesso su questo PC), scarichiamo dal server
-    # Verifichiamo se manca anche solo un dato importante
+    # se la cache è vuota scarico dal server
     if not user_weight or not user_height or not user_age:
-        print("⏳ Cache vuota o incompleta. Scarico dati dal server...")
+        print("--> Cache vuota o incompleta. Scarico dati dal server...")
         server_data = get_user_data(user_oid)
 
         if server_data:
-            # Prendiamo i dati dal server
             user_weight = server_data.get("peso", "inserisci dati")
             user_height = server_data.get("altezza", "inserisci dati")
             user_age = server_data.get("età", "inserisci dati")
             
-            # SALVIAMO SUBITO IN CACHE per la prossima volta
+            # salvataggio in cache per il prossimo accesso
             page.client_storage.set("user_weight", user_weight)
             page.client_storage.set("user_height", user_height)
             page.client_storage.set("user_age", user_age)
         else:
-            # Fallback se server offline e cache vuota
+            # se server offline e cache vuota
             user_weight = "inserisci dati"
             user_height = "inserisci dati"
             user_age = "inserisci dati"
     else:
-        print("⚡ Dati utente caricati dalla Cache locale (Nessuna chiamata server).")
+        print("--> Dati utente caricati dalla Cache locale.")
 
 
-    # --- 2. LOGICA CALCOLO BMI & BMR ---
+    # LOGICA CALCOLO BMI E BMR
     def calculate_metrics():
         try:
             w = float(user_weight)
@@ -62,7 +60,7 @@ def home_view(page: ft.Page):
             elif bmi < 30: lbl_bmi_desc.value, lbl_bmi_desc.color = "Sovrappeso", "orange"
             else: lbl_bmi_desc.value, lbl_bmi_desc.color = "Obeso", "red"
 
-            # BMR (Formula Mifflin-St Jeor approssimata per uomo)
+            # BMR (Formula approssimata per uomo)
             bmr = (10 * w) + (6.25 * h) - (5 * a) + 5
             lbl_bmr_val.value = f"{int(bmr)}"
             
@@ -72,12 +70,12 @@ def home_view(page: ft.Page):
         
         page.update()
 
-    # UI Elementi per le metriche
+    # UI metriche
     lbl_bmi_val = ft.Text("--", size=30, weight="bold", color="white")
     lbl_bmi_desc = ft.Text("...", size=14, color="grey")
     lbl_bmr_val = ft.Text("--", size=30, weight="bold", color="white")
 
-    # --- 3. DIALOG MODIFICA DATI ---
+    # DIALOG MODIFICA DATI
     txt_edit_weight = ft.TextField(label="Peso (kg)", value=user_weight, bgcolor="#1e293b", color="white", border_color="#334155")
     txt_edit_height = ft.TextField(label="Altezza (cm)", value=user_height, bgcolor="#1e293b", color="white", border_color="#334155")
     txt_edit_age = ft.TextField(label="Età", value=user_age, bgcolor="#1e293b", color="white", border_color="#334155")
@@ -85,22 +83,20 @@ def home_view(page: ft.Page):
     def save_stats(e):
         nonlocal user_weight, user_height, user_age
         
-        # 1. Prendiamo i nuovi valori inputati
         new_weight = txt_edit_weight.value
         new_height = txt_edit_height.value
         new_age = txt_edit_age.value
-        
-        # 2. Aggiorniamo le variabili locali
+    
         user_weight = new_weight
         user_height = new_height
         user_age = new_age
         
-        # 3. Aggiorniamo la UI subito
+        # aggiornamento UI 
         lbl_weight.value = f"{user_weight} kg"
         lbl_height.value = f"{user_height} cm"
         lbl_age.value = f"{user_age} anni"
         
-        # 4. AGGIORNAMENTO SERVER (Thread separato per non bloccare)
+        # aggiornamento server 
         user_biometrics={
             "peso": user_weight,
             "altezza": user_height,
@@ -109,12 +105,11 @@ def home_view(page: ft.Page):
         }
         update_user(user_biometrics)
 
-        # 5. AGGIORNAMENTO CACHE LOCALE (Fondamentale!)
-        # Così al prossimo riavvio l'app troverà i dati nuovi senza chiedere al server
+        # aggiornamento cache locale
         page.client_storage.set("user_weight", user_weight)
         page.client_storage.set("user_height", user_height)
         page.client_storage.set("user_age", user_age)
-        print("✅ Cache locale aggiornata con i nuovi dati.")
+        print("--> Cache locale aggiornata con i nuovi dati")
         
         calculate_metrics()
         page.close(dialog_edit)
@@ -131,9 +126,9 @@ def home_view(page: ft.Page):
         ]
     )
 
-    # --- 4. CARICAMENTO STATISTICHE ALLENAMENTO (Ottimizzato) ---
-    # Anche qui usiamo una cache "leggera" per mostrare subito i numeri,
-    # poi il thread in background controlla se ci sono novità.
+
+    # caricamento dati allenamento
+    # cache per caricare subito la home, thread in background per controllare se ci sono novità
     
     cached_num_schede = page.client_storage.get("stats_num_schede") or "..."
     cached_num_ex = page.client_storage.get("stats_num_ex") or "..."
@@ -144,29 +139,27 @@ def home_view(page: ft.Page):
     def load_gym_stats():
         if not user_email: return
         try:
-            # Scarica i dati freschi
+            # download dati server
             schede = get_schede(user_email)
             num_schede = len(schede)
             num_ex = sum(len(s.get('esercizi', [])) for s in schede)
             
-            # Aggiorna UI
+            # aggiornamento UI
             lbl_count_schede.value = str(num_schede)
             lbl_count_esercizi.value = str(num_ex)
             page.update()
             
-            # Aggiorna Cache per la prossima volta
+            # aggiornamento cache
             page.client_storage.set("stats_num_schede", num_schede)
             page.client_storage.set("stats_num_ex", num_ex)
             
         except Exception as e:
             print(f"Errore stats: {e}")
 
-    # Avviamo il thread per aggiornare i numeri in background
-    # (Così l'utente vede subito i vecchi numeri cache, poi si aggiornano da soli)
+    #  thread per aggiornare i numeri in background
     threading.Thread(target=load_gym_stats, daemon=True).start()
 
-    # --- 5. COMPONENTI UI (Resto del codice invariato) ---
-    
+    # UI
     header = ft.Row([
         ft.Column([
             ft.Text(f"Ciao, {user_name}", size=28, weight=ft.FontWeight.BOLD, color="white", no_wrap=False),
@@ -257,14 +250,14 @@ def home_view(page: ft.Page):
         shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.CYAN_900, offset=ft.Offset(0,0))
     )
 
-    # --- NAVIGAZIONE (Modificata) ---
+    # NAVIGAZIONE 
     def nav_change(e):
         index = e.control.selected_index
         if index == 0: page.go("/schede")
-        elif index == 1: pass # Siamo in Home
-        elif index == 2: page.go("/workout") # Nuova sezione Allenamento
+        elif index == 1: pass 
+        elif index == 2: page.go("/workout")
 
-    # Calcoliamo le metriche subito con i dati (cache o server)
+    # chiamata funzione poer calcolo metriche allenamento
     calculate_metrics()
 
     return ft.View(
@@ -282,14 +275,13 @@ def home_view(page: ft.Page):
         ],
         navigation_bar=ft.NavigationBar(
             destinations=[
-                # ORDINE: Schede - Home - Allenamento
                 ft.NavigationBarDestination(icon=ft.Icons.FOLDER_COPY, label="Schede"),
                 ft.NavigationBarDestination(icon=ft.Icons.HOME, label="Home"),
                 ft.NavigationBarDestination(icon=ft.Icons.SPORTS_GYMNASTICS, label="Allenamento"),
             ],
             bgcolor="#1e293b",
             indicator_color=ft.Colors.BLUE_600,
-            selected_index=1, # Home è l'indice 1 (Centro)
+            selected_index=1, 
             on_change=nav_change
         )
     )

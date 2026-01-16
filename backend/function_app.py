@@ -20,7 +20,7 @@ KEY_VAULT_URL = os.environ.get("KEY_VAULT_URL")
 
 def get_secret(secret_name, fallback_env_var=None):
     """
-    Tenta di leggere dal Key Vault. Se fallisce
+    Tentativo di lettura dal Key Vault
     """
     if KEY_VAULT_URL:
         try:
@@ -36,7 +36,7 @@ def get_secret(secret_name, fallback_env_var=None):
     return None
 
 # --- CONFIGURAZIONE ---
-# Recupera le chiavi dalle variabili d'ambiente (Azure key vault)
+# Recupera le chiavi dalle variabili d'ambiente (da key vault)
 
 COSMOS_ENDPOINT = get_secret("COSMOS-ENDPOINT")
 COSMOS_KEY = get_secret("COSMOS-KEY")
@@ -48,7 +48,7 @@ OPENAI_ENDPOINT = get_secret("OPENAI-ENDPOINT")
 OPENAI_DEPLOYMENT = get_secret("OPENAI-DEPLOYMENT")
 
 
-# --- INIZIALIZZAZIONE CLIENT (Eseguita una volta all'avvio) ---
+# --- INIZIALIZZAZIONE CLIENT ---
 try:
     cosmos_client = CosmosClient(COSMOS_ENDPOINT, COSMOS_KEY)
     database = cosmos_client.get_database_client(DB_NAME)
@@ -64,13 +64,10 @@ except Exception as e:
 # 1. AUTENTICAZIONE 
 # ==================================================================================
 
-# Aggiungi questo import se manca
-# from function_app import get_secret
-
 @app.route(route="get_auth_config", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
 def get_auth_config(req: func.HttpRequest) -> func.HttpResponse:
     try:
-        # Recupera l'ID dal Key Vault usando la tua funzione helper esistente
+        # Recupera l'id dal vault
         client_id = get_secret("CLIENT-ID-APP-AUTH")
         
         if not client_id:
@@ -88,7 +85,7 @@ def get_auth_config(req: func.HttpRequest) -> func.HttpResponse:
 
 
 # ==================================================================================
-# 2. GESTIONE SCHEDE (Replica _save_workout_impl, get_schede, delete_workout)
+# 2. GESTIONE SCHEDE 
 # ==================================================================================
 
 @app.route(route="save_scheda", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
@@ -96,13 +93,13 @@ def save_scheda(req: func.HttpRequest) -> func.HttpResponse:
     try:
         workout_data = req.get_json()
         
-        # Logica originale: se manca ID lo genero, aggiorno timestamp
+        # se manca l'id lo genero, aggiorno timestamp
         if "id" not in workout_data:
             workout_data["id"] = str(uuid.uuid4())
         
         workout_data["last_updated"] = datetime.now().isoformat()
         
-        # Logica originale: Upsert
+        # upsert
         container_schede.upsert_item(body=workout_data)
         
         return func.HttpResponse(json.dumps({"message": "Salvato", "id": workout_data["id"]}), status_code=200)
@@ -113,7 +110,7 @@ def save_scheda(req: func.HttpRequest) -> func.HttpResponse:
 def get_schede(req: func.HttpRequest) -> func.HttpResponse:
     user_email = req.params.get('user_email')
     try:
-        # Logica originale: Query specifica
+
         query = "SELECT * FROM c WHERE c.user_email = @user AND c.type = 'scheda'"
         parameters = [{"name": "@user", "value": user_email}]
         
@@ -134,23 +131,20 @@ def delete_scheda(req: func.HttpRequest) -> func.HttpResponse:
         w_id = data.get('id')
         user = data.get('user_email')
         
-        # Logica originale: Delete con partition key
+        # delete con partition key
         container_schede.delete_item(item=w_id, partition_key=user)
         return func.HttpResponse("Eliminato", status_code=200)
     except Exception as e:
         return func.HttpResponse(f"Errore: {str(e)}", status_code=500)
 
 # ==================================================================================
-# 3. GESTIONE ESERCIZI (Replica get_all_exercises, add_custom_exercise_async)
+# 3. GESTIONE ESERCIZI 
 # ==================================================================================
 
 @app.route(route="get_exercises", auth_level=func.AuthLevel.ANONYMOUS, methods=["GET"])
 def get_exercises(req: func.HttpRequest) -> func.HttpResponse:
     try:
-        # Logica originale: Query specifica per 'esercizio_catalogo'
-        # Nota: Ho corretto 'ORDER BY c.nome' in 'c.name' se il campo è name, 
-        # ma lascio la tua query originale se nel DB usi 'nome'.
-        # Basandomi sul tuo file: "SELECT c.name FROM c ... ORDER BY c.nome ASC"
+        # query specifica per esercizio_catalogo
         user_email = req.params.get('user_email')
     
         query = """
@@ -168,7 +162,7 @@ def get_exercises(req: func.HttpRequest) -> func.HttpResponse:
             enable_cross_partition_query=True
         ))
         
-        # Restituisco la lista semplice di nomi come faceva la tua funzione locale
+        # restituisce la lista di nomi
         names = [item['exercise_name'] for item in items]
         return func.HttpResponse(json.dumps(names), status_code=200, mimetype="application/json")
     except Exception as e:
@@ -181,7 +175,7 @@ def get_exercises_full(req: func.HttpRequest) -> func.HttpResponse:
     try:
         user_email = req.params.get('user_email')
         
-        # Prendiamo sia quelli di sistema che quelli dell'utente
+        # prebde sia quelli di sistema che quelli dell'utente
         query = """
             SELECT *
             FROM c 
@@ -205,7 +199,7 @@ def get_exercises_full(req: func.HttpRequest) -> func.HttpResponse:
 def add_exercise(req: func.HttpRequest) -> func.HttpResponse:
     try:
         data = req.get_json()
-        # Logica originale di creazione esercizio custom
+        # logica di creazione esercizio custom
         item = {
             "id": str(uuid.uuid4()),
             "user_email": data.get("user_email", "system"), 
@@ -224,17 +218,15 @@ def delete_exercise(req: func.HttpRequest) -> func.HttpResponse:
     try:
         data = req.get_json()
         ex_id = data.get('id')
-        # Recuperiamo il nome, fondamentale perché è la Partition Key
+        # recupero del nome (partition key)
         ex_name = data.get('exercise_name') 
         
         logging.info(f"Tentativo eliminazione ID: {ex_id} - Nome: {ex_name}")
 
-        # TENTATIVO DIRETTO: Chiave partizione = exercise_name (Configurazione Utente)
         try:
             container_esercizi.delete_item(item=ex_id, partition_key=ex_name)
             return func.HttpResponse("Eliminato (Key: Name)", status_code=200)
         except exceptions.CosmosResourceNotFoundError:
-            # Fallback (giusto per sicurezza)
             logging.warning("Non trovato con PK=name. Provo altre chiavi...")
             try:
                 # Tentativo disperato con ID (se mai cambiasse configurazione)
@@ -248,43 +240,38 @@ def delete_exercise(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(f"Errore: {str(e)}", status_code=500)
 
 # ==================================================================================
-# 4. AI ANALISI IMMAGINE (Replica analyze_workout_image)
+# 4. AI ANALISI IMMAGINE 
 # ==================================================================================
 
 @app.route(route="analyze_image", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
 def analyze_image(req: func.HttpRequest) -> func.HttpResponse:
     try:
-        # Recupero il file raw dalla richiesta
+        # recupero il file raw dalla richiesta
         file = req.files.get('file')
         if not file:
             return func.HttpResponse("Nessun file inviato", status_code=400)
             
         file_content = file.read()
         
-        # Client AI inizializzato qui per usare le chiavi server-side
+        # client AI inizializzato qui per usare le chiavi server-side
         doc_client = DocumentAnalysisClient(
             endpoint=DOC_INTEL_ENDPOINT, 
             credential=AzureKeyCredential(DOC_INTEL_KEY)
         )
         
-        # Logica originale: "prebuilt-layout"
         poller = doc_client.begin_analyze_document("prebuilt-layout", document=file_content)
         result = poller.result()
         
-        # SERIALIZZAZIONE:
-        # Poiché non possiamo restituire l'oggetto Python 'result' direttamente via HTTP,
-        # dobbiamo trasformarlo in un JSON che il tuo 'ai_utils.py' possa leggere.
-        
         output = {"pages": [], "tables": []}
         
-        # 1. Estrazione Linee (per il fallback riga per riga)
+        # 1 estrazione Linee (riga per riga)
         for page in result.pages:
             lines_data = []
             for line in page.lines:
                 lines_data.append({"content": line.content})
             output["pages"].append({"lines": lines_data})
             
-        # 2. Estrazione Tabelle (per la logica avanzata celle)
+        # 2 estrazione Tabelle (per la logica relativa alle celle)
         for table in result.tables:
             cells_data = []
             for cell in table.cells:
@@ -302,7 +289,7 @@ def analyze_image(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(f"Errore analisi AI: {str(e)}", status_code=500)
 
 # ==================================================================================
-# 5. AI GENERATIVA (COACH)
+# 5. AI PER GENERAZIONE SCHEDE
 # ==================================================================================
 
 @app.route(route="generate_workout", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
@@ -315,7 +302,6 @@ def generate_workout(req: func.HttpRequest) -> func.HttpResponse:
         if not user_prompt:
             return func.HttpResponse("Prompt mancante", status_code=400)
 
-        # Configurazione Client (Gestisce sia Azure che Standard)
         if "azure" in str(OPENAI_ENDPOINT).lower():
             client = AzureOpenAI(
                 azure_endpoint=OPENAI_ENDPOINT, 
@@ -323,7 +309,7 @@ def generate_workout(req: func.HttpRequest) -> func.HttpResponse:
                 api_version="2023-05-15"
             )
 
-        # System Prompt: Istruiamo l'AI a rispondere SOLO con JSON valido
+        # PROMPT PER LLM
         system_msg = """
         Sei un Personal Trainer esperto. Il tuo compito è creare schede di allenamento basate sulle richieste dell'utente.
         DEVI rispondere ESCLUSIVAMENTE con un oggetto JSON valido, senza altro testo prima o dopo.
@@ -344,7 +330,7 @@ def generate_workout(req: func.HttpRequest) -> func.HttpResponse:
         """
 
         response = client.chat.completions.create(
-            model=OPENAI_DEPLOYMENT, # Nome del deployment su Azure o modello (gpt-3.5-turbo)
+            model=OPENAI_DEPLOYMENT, # nome del deployment su Azure o modello
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": f"Utente: {user_email}. Richiesta: {user_prompt}"}
@@ -352,19 +338,19 @@ def generate_workout(req: func.HttpRequest) -> func.HttpResponse:
             temperature=0.7
         )
 
-        # Pulizia della risposta (a volte GPT mette ```json ... ```)
+        # pulizia della risposta
         content = response.choices[0].message.content
         content = content.replace("```json", "").replace("```", "").strip()
         
-        # Validazione JSON
+        # validazione json
         workout_json = json.loads(content)
         
-        # Aggiungiamo ID e timestamp per renderla pronta al salvataggio
+        # aggiunta id e timestamp per renderla pronta al salvataggio
         workout_json["id"] = str(uuid.uuid4())
         workout_json["user_email"] = user_email
         workout_json["type"] = "scheda"
         workout_json["created_at"] = datetime.now().strftime("%Y-%m-%d")
-        workout_json["ai_generated"] = True # Flag importante
+        workout_json["ai_generated"] = True 
 
         return func.HttpResponse(json.dumps(workout_json), status_code=200, mimetype="application/json")
 
@@ -382,7 +368,7 @@ def save_new_user(req: func.HttpRequest) -> func.HttpResponse:
     try:
         user_data = req.get_json()
         
-        # 1. Estraiamo l'OID (il codice fiscale digitale Microsoft)
+        # estrazione oid (codice microsoft)
         oid = user_data.get("oid")
         email = user_data.get("email")
         name = user_data.get("name")
@@ -390,8 +376,8 @@ def save_new_user(req: func.HttpRequest) -> func.HttpResponse:
         if not oid:
             return func.HttpResponse("OID mancante: impossibile identificare utente.", status_code=400)
 
-        # 2. CONTROLLO DI UNICITÀ
-        # Cerchiamo nel DB se c'è già un utente con questo OID
+        # CONTROLO DI UNICITÀ TRAMITE OID
+
         query = "SELECT * FROM c WHERE c.oid = @oid"
         parameters = [{"name": "@oid", "value": oid}]
         
@@ -403,16 +389,13 @@ def save_new_user(req: func.HttpRequest) -> func.HttpResponse:
 
         # 3. LOGICA DI SALVATAGGIO
         if len(items) > 0:
-            # CASO A: L'utente esiste già.
-            # (Opzionale) Potresti aggiornare un campo "last_login" qui se volessi
             logging.info(f"Utente {email} già presente nel DB. Salto il salvataggio.")
             return func.HttpResponse("Utente già registrato", status_code=200)
         
         else:
-            # CASO B: È la prima volta che entra. 
             new_user = {
-                "id": oid,          # Usiamo l'OID anche come ID del documento per efficienza
-                "oid": oid,         # Salviamolo anche esplicitamente
+                "id": oid,          # uso l'OID anche come ID del documento per efficienza
+                "oid": oid,         # combacia con oid
                 "user_name": name,
                 "user_email": email,
                 "peso": "inserisci dati",
@@ -428,6 +411,9 @@ def save_new_user(req: func.HttpRequest) -> func.HttpResponse:
     except Exception as e:
         logging.error(f"Errore save_user: {e}")
         return func.HttpResponse(f"Errore: {str(e)}", status_code=500)
+    
+
+
 @app.route(route="update_user", auth_level=func.AuthLevel.ANONYMOUS)
 def update_user(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('--- UPDATE USER START ---')
@@ -435,7 +421,7 @@ def update_user(req: func.HttpRequest) -> func.HttpResponse:
     try:
         req_body = req.get_json()
         
-        # Dati in arrivo
+        # dati in arrivo
         oid = req_body.get('oid')
         peso = req_body.get('peso')
         altezza = req_body.get('altezza')
@@ -448,8 +434,8 @@ def update_user(req: func.HttpRequest) -> func.HttpResponse:
 
         logging.info(f"Cercando utente con OID: {oid}")
 
-        # 1. CERCHIAMO L'UTENTE TRAMITE QUERY
-        # Questo aggira il problema della Partition Key errata
+        #  RICERCA L'UTENTE TRAMITE QUERY
+
         query = "SELECT * FROM c WHERE c.oid = @oid"
         parameters = [{"name": "@oid", "value": oid}]
         
@@ -463,14 +449,10 @@ def update_user(req: func.HttpRequest) -> func.HttpResponse:
             logging.warning(f"Nessun utente trovato con OID: {oid}")
             return func.HttpResponse("Utente non trovato nel database.", status_code=404)
 
-        # 2. RECUPERIAMO IL DOCUMENTO REALE
         user_item = items[0]
         logging.info(f"Utente trovato: {user_item.get('user_email')}")
         print("utente trovato--->", user_item)
 
-        # 3. AGGIORNIAMO I CAMPI (Solo se l'utente ha scritto qualcosa)
-        # Convertiamo in stringa o numero a seconda di come vuoi salvarli, 
-        # qui li salvo come stringhe per sicurezza, ma puoi fare int() se preferisci.
         if peso: 
             user_item['peso'] = str(peso)
         if altezza: 
@@ -479,9 +461,6 @@ def update_user(req: func.HttpRequest) -> func.HttpResponse:
             user_item['età'] = str(eta)
         
 
-        # 4. SALVIAMO (UPSERT)
-        # Cosmos DB è intelligente: leggendo user_item, sa già qual è la partition key corretta (l'email)
-        # che si trova dentro l'oggetto stesso.
         container_user.upsert_item(body=user_item)
 
         logging.info("Dati aggiornati e salvati correttamente.")
@@ -499,13 +478,13 @@ def get_user_data(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('--- GET USER DATA START ---')
 
     try:
-        # Recuperiamo l'oid dai parametri dell'URL (es: ?oid=123...)
+        # recupero dell'oid dai parametri dell'URL 
         oid = req.params.get('oid')
 
         if not oid:
             return func.HttpResponse("Errore: parametro 'oid' mancante.", status_code=400)
 
-        # Usiamo la Query (metodo sicuro)
+
         query = "SELECT * FROM c WHERE c.oid = @oid"
         parameters = [{"name": "@oid", "value": oid}]
         
@@ -519,15 +498,8 @@ def get_user_data(req: func.HttpRequest) -> func.HttpResponse:
             logging.warning(f"Nessun utente trovato con OID: {oid}")
             return func.HttpResponse("Utente non trovato.", status_code=404)
 
-        # Prendiamo il primo risultato
+        # prendo il primo risultato
         user_data = items[0]
-
-        # Rimuoviamo campi interni di Cosmos DB che non servono al frontend (opzionale ma pulito)
-        # user_data.pop('_rid', None)
-        # user_data.pop('_self', None)
-        # user_data.pop('_etag', None)
-        # user_data.pop('_attachments', None)
-        # user_data.pop('_ts', None)
 
         return func.HttpResponse(
             json.dumps(user_data),
@@ -541,7 +513,7 @@ def get_user_data(req: func.HttpRequest) -> func.HttpResponse:
     
 
 # ==================================================================================
-# 6. GESTIONE LOG ALLENAMENTO (STORICO)
+# 6. GESTIONE LOG ALLENAMENTO (STORICO_ALLENAMENTO)
 # ==================================================================================
 
 @app.route(route="save_workout_log", auth_level=func.AuthLevel.ANONYMOUS, methods=["POST"])
@@ -561,7 +533,7 @@ def save_workout_log(req: func.HttpRequest) -> func.HttpResponse:
 def get_workout_logs(req: func.HttpRequest) -> func.HttpResponse:
     user_email = req.params.get('user_email')
     try:
-        # Ordiniamo per data decrescente (dal più recente)
+        # ordinametno per data decrescente 
         query = "SELECT * FROM c WHERE c.user_email = @user AND c.type = 'workout_log' ORDER BY c.completed_at DESC"
         parameters = [{"name": "@user", "value": user_email}]
         

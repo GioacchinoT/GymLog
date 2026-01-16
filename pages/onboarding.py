@@ -5,21 +5,18 @@ import threading
 
 def onboarding_view(page: ft.Page):
     
-    # --- ELEMENTI UI (Stile Originale) ---
     
-    # Bottone Blu Principale
+    # bottone blu per accesso
     btn_text = ft.Text("Accedi con Microsoft", color="white", weight="bold", size=16)
     loading_ring_main = ft.ProgressRing(width=20, height=20, stroke_width=2, color="white", visible=False)
     btn_icon = ft.Icon(ft.Icons.WINDOW_SHARP, color="white", size=20)
     error_txt = ft.Text("", color="red", size=14)
 
-    # --- SEZIONE CODICE ---
+    # sezione codice accesso
     lbl_istruzioni = ft.Text("Copia il codice e inseriscilo nel link:", color="#94a3b8", visible=False, size=13)
-    
-    # Testo Codice
     lbl_codice = ft.Text("", size=30, weight="bold", color=ft.Colors.CYAN_400, selectable=True, font_family="monospace")
     
-    # Tastino Copia
+    # pulsante copia
     btn_copy = ft.IconButton(
         icon=ft.Icons.CONTENT_COPY,
         icon_color=ft.Colors.CYAN_400,
@@ -27,7 +24,7 @@ def onboarding_view(page: ft.Page):
         on_click=lambda e: copy_code(e)
     )
 
-    # Riga Codice + Tasto
+
     row_codice = ft.Row(
         [lbl_codice, btn_copy],
         alignment=ft.MainAxisAlignment.CENTER,
@@ -35,7 +32,7 @@ def onboarding_view(page: ft.Page):
         visible=False
     )
     
-    # Bottone Arancione Link
+    # bottone arancione link
     btn_apri_link = ft.Container(
         content=ft.Text("APRI PAGINA MICROSOFT", color="white", weight="bold"),
         bgcolor=ft.Colors.ORANGE_600,
@@ -43,12 +40,11 @@ def onboarding_view(page: ft.Page):
         border_radius=8,
         width=300,
         alignment=ft.alignment.center,
-        on_click=lambda e: None, # Assegnato dinamicamente
+        on_click=lambda e: None, 
         visible=False
     )
 
-    # --- NUOVA ROTELLA (Sotto il tasto arancione) ---
-    # Questa appare SOLO quando clicchi "Apri Pagina Microsoft"
+    # loading ring 
     loading_wait = ft.ProgressRing(width=20, height=20, stroke_width=2, color="white", visible=False)
     lbl_wait = ft.Text("In attesa del login...", color="grey", size=12, italic=True, visible=False)
     
@@ -58,35 +54,35 @@ def onboarding_view(page: ft.Page):
     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5, visible=False)
 
 
-    # --- FUNZIONI ---
 
     def copy_code(e):
         page.set_clipboard(lbl_codice.value)
         page.open(ft.SnackBar(ft.Text("Codice copiato negli appunti!"), bgcolor="green"))
 
     def on_link_clicked(e, url):
-        """Gestisce il click sul tasto arancione"""
-        # Apre il browser
+        # gestione click tasto arancione 
+
+
+        # apre il browser
         page.launch_url(url)
         
-        # Mostra la rotella di attesa sotto
+        # mostra il loading ring
         col_wait.visible = True
         loading_wait.visible = True
         lbl_wait.visible = True
         page.update()
 
     def mostra_codice_ui(user_code, verification_uri):
-        # Nasconde bottone blu
+        # nasconde btn blu
         btn_login_container.visible = False
         
-        # Mostra sezione codice
+        # mostra sezione codice
         lbl_istruzioni.visible = True
         lbl_codice.value = user_code
         row_codice.visible = True
         
-        # Configura e mostra tasto arancione
         btn_apri_link.visible = True
-        # Qui colleghiamo la nuova funzione che mostra la rotella
+        # collegamento funzione per mostrare loading ring
         btn_apri_link.on_click = lambda e: on_link_clicked(e, verification_uri)
         
         page.update()
@@ -117,7 +113,7 @@ def onboarding_view(page: ft.Page):
         threading.Thread(target=process_login, daemon=True).start()
 
     def reset_ui_state():
-        # Ripristina tutto lo stato iniziale
+        # ripristina tutto lo stato iniziale
         btn_icon.visible = True
         btn_text.value = "Accedi con Microsoft"
         loading_ring_main.visible = False
@@ -129,10 +125,9 @@ def onboarding_view(page: ft.Page):
         row_codice.visible = False
         btn_apri_link.visible = False
         
-        # Nascondi anche la nuova rotella di attesa
         col_wait.visible = False
 
-    # Container del bottone principale (Stile quadrato originale)
+    # container del bottone accesso
     btn_login_container = ft.Container(
         content=ft.Row([
             btn_icon,
@@ -147,6 +142,7 @@ def onboarding_view(page: ft.Page):
         animate=ft.Animation(200, "easeOut")
     )
 
+    # UI
     return ft.View(
         "/welcome",
         padding=ft.padding.only(top=60, left=20, right=20, bottom=20), 
@@ -159,17 +155,16 @@ def onboarding_view(page: ft.Page):
                     
                     ft.Container(height=60),
                     
-                    btn_login_container, # Bottone blu
+                    btn_login_container, 
                     
-                    # Area Codice (appare dopo)
                     ft.Container(height=20),
                     lbl_istruzioni,
-                    row_codice,          # Codice + Tasto Copia
+                    row_codice,          
                     ft.Container(height=10),
-                    btn_apri_link,       # Bottone arancione
+                    btn_apri_link,       
                     
                     ft.Container(height=15),
-                    col_wait,            # <--- NUOVA ROTELLA DI ATTESA QUI
+                    col_wait,            
                     
                     ft.Container(height=10),
                     error_txt,

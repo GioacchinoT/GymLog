@@ -5,7 +5,7 @@ import time
 def generator_view(page: ft.Page):
     user_email = page.client_storage.get("user_email") or "Atleta"
 
-    # --- INPUT USER ---
+    # input user
     txt_prompt = ft.TextField(
         label="Descrivi il tuo obiettivo",
         hint_text="Es. Voglio allenare le gambe per la forza, ho solo manubri, 3 giorni a settimana...",
@@ -18,38 +18,37 @@ def generator_view(page: ft.Page):
         border_radius=12
     )
 
-    # --- INDICATORE CARICAMENTO ---
+    # --- indicatore caricamento
     loading_anim = ft.Column([
         ft.ProgressRing(color=ft.Colors.PURPLE_400),
         ft.Text("Il Coach AI sta creando la tua scheda...", color=ft.Colors.PURPLE_200)
     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, visible=False)
 
-    # --- FUNZIONE GENERAZIONE ---
+    # --- funzione generazione scheda
     def btn_generate_click(e):
         if not txt_prompt.value:
             txt_prompt.error_text = "Scrivi qualcosa!"
             page.update()
             return
 
-        # 1. UI Loading
+        # loading
         btn_generate.disabled = True
         loading_anim.visible = True
         page.update()
 
-        # 2. Chiamata Backend
+        # chiamata backend
         scheda_json = generate_workout_ai(txt_prompt.value, user_email)
 
-        # 3. Gestione Risultato
         loading_anim.visible = False
         btn_generate.disabled = False
         
         if scheda_json:
-            # Salviamo subito la scheda generata
+            # salvataggio scheda generata
             save_scheda(scheda_json)
             
             page.open(ft.SnackBar(ft.Text("Scheda creata e salvata con successo!"), bgcolor="green"))
-            time.sleep(1) # Un attimo per leggere
-            page.go("/schede") # Torniamo alla lista
+            time.sleep(1) # sleep per leggere la scheda
+            page.go("/schede") 
         else:
             page.open(ft.SnackBar(ft.Text("Errore nella generazione. Riprova."), bgcolor="red"))
         
@@ -67,13 +66,13 @@ def generator_view(page: ft.Page):
         shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.PURPLE_900)
     )
 
-    # --- LAYOUT ---
+    # UI
     return ft.View(
         "/generatore",
         bgcolor="#0f172a",
         padding=ft.padding.only(top=60, left=20, right=20, bottom=20),
         controls=[
-            # Header
+            # header
             ft.Row([
                 ft.IconButton(ft.Icons.ARROW_BACK_IOS, icon_color="white", on_click=lambda e: page.go("/schede")),
                 ft.Text("AI Coach", size=24, weight="bold", color="white"),
@@ -81,7 +80,7 @@ def generator_view(page: ft.Page):
             
             ft.Container(height=20),
             
-            # Card Input
+            # card input
             ft.Container(
                 content=ft.Column([
                     ft.Text("Chiedi al Coach", size=18, weight="bold", color=ft.Colors.PURPLE_200),
@@ -99,7 +98,7 @@ def generator_view(page: ft.Page):
                 border=ft.border.all(1, ft.Colors.PURPLE_900)
             ),
             
-            # Suggerimenti
+            # suggerimenti prompt
             ft.Container(height=30),
             ft.Text("Esempi di prompt:", color="grey", weight="bold"),
             ft.Column([

@@ -8,26 +8,25 @@ def create_routine_view(page: ft.Page):
     current_user = page.client_storage.get("user_email") or "Utente"
     
     # --- 1. CONTROLLO MODIFICA ---
-    # Vediamo se c'è una scheda in "memoria" da modificare
+    # Vediamo se c'è una scheda in locale da modificare nel caso venga oremuto il tasto modifica
     scheda_da_modificare = page.client_storage.get("scheda_edit")
     
-    # Se stiamo modificando, usiamo i suoi dati, altrimenti buffer vuoto
+    # se stiamo modificando usiamo i suoi dati altrimenti si inizia da zero
     is_editing = scheda_da_modificare is not None
     exercises_buffer = scheda_da_modificare.get("esercizi", []) if is_editing else []
     
-    # Caricamento catalogo esercizi
+    # caricamento catalogo esercizi
     lista_esercizi_db = get_exercise(current_user)
     if not lista_esercizi_db: lista_esercizi_db = ["Esercizio Generico"]
 
     options_list = []
     for ex in lista_esercizi_db:
-        # Gestiamo il caso in cui ex sia un dizionario (nuova logica) o stringa (fallback)
         nome = ex.get("exercise_name") if isinstance(ex, dict) else ex
         options_list.append(ft.dropdown.Option(nome))
 
     dd_exist = ft.Dropdown(
         label="Seleziona Esistente",
-        options=options_list, # Usiamo la lista corretta
+        options=options_list,
         bgcolor="#1e293b", border_color="#334155", color="white", width=250
     )
 
@@ -48,7 +47,7 @@ def create_routine_view(page: ft.Page):
             )
         ], spacing=5)
 
-    # 2. PRE-COMPILAZIONE CAMPI
+    # PRE-COMPILAZIONE CAMPI
     init_nome = scheda_da_modificare.get("nome_scheda", "") if is_editing else ""
     init_split = scheda_da_modificare.get("split_type", "") if is_editing else ""
 
@@ -58,7 +57,7 @@ def create_routine_view(page: ft.Page):
     lbl_esercizi_count = ft.Text(f"ESERCIZI ({len(exercises_buffer)})", size=12, weight="bold", color="#94a3b8")
     exercises_column = ft.Column(spacing=10)
 
-    # ... (DIALOG E LOGICA AGGIUNTA ESERCIZIO ) ...
+    # DIALOG E LOGICA AGGIUNTA ESERCIZIO 
     dd_exist = ft.Dropdown(
         label="Seleziona Esistente",
         options=[ft.dropdown.Option(ex) for ex in lista_esercizi_db],
@@ -84,8 +83,6 @@ def create_routine_view(page: ft.Page):
         if sw_custom.value:
             add_custom_exercise(ex_name, current_user)
             dd_exist.options.append(ft.dropdown.Option(ex_name))
-
-
 
         new_ex = {
             "id": str(uuid.uuid4())[:8],
@@ -134,7 +131,7 @@ def create_routine_view(page: ft.Page):
         lbl_esercizi_count.value = f"ESERCIZI ({len(exercises_buffer)})"
         page.update()
 
-    # --- 3. SALVATAGGIO LOGICO (Insert o Update) ---
+    # ---  SALVATAGGIO O UPDATE ---
     def salva_scheda_logico(e):
         title = txt_nome.controls[1].value
         split = txt_split.controls[1].value
@@ -143,7 +140,7 @@ def create_routine_view(page: ft.Page):
             return
             
         payload = {
-            # Se editiamo, manteniamo l'ID vecchio. Se nuova, ID nuovo.
+            # se è in modifica manteniamo l'id vecchio altrimenti id nuovo.
             "id": scheda_da_modificare['id'] if is_editing else str(uuid.uuid4()),
             "user_email": current_user,
             "type": "scheda",
@@ -155,20 +152,18 @@ def create_routine_view(page: ft.Page):
         
         save_scheda(payload)
         
-        # Pulizia della memoria di edit
+        # pulizia della memoria di edit
         page.client_storage.remove("scheda_edit")
         
         page.open(ft.SnackBar(ft.Text("Scheda Salvata/Aggiornata!"), bgcolor="green"))
         page.go("/schede")
 
-    # Funzione per tornare indietro
     def go_back(e):
-        # Importante: pulire la memoria se l'utente annulla la modifica
+        # pulizia memoria se l'utente annulla la modifica
         page.client_storage.remove("scheda_edit")
         page.go("/schede")
 
-    # --- INIZIALIZZAZIONE ---
-    # Se stiamo editando, popoliamo la lista esercizi visiva subito
+    # se l'utente è in modifica popoliamo la lista esercizi visiva subito
     if is_editing: update_exercises_list()
 
     btn_add_big = ft.Container(
@@ -206,13 +201,12 @@ def create_routine_view(page: ft.Page):
         ],
         navigation_bar=ft.NavigationBar(
             destinations=[
-                # ORDINE: Schede - Home - Allenamento
                 ft.NavigationBarDestination(icon=ft.Icons.FOLDER_COPY, label="Schede"),
                 ft.NavigationBarDestination(icon=ft.Icons.HOME, label="Home"),
                 ft.NavigationBarDestination(icon=ft.Icons.SPORTS_GYMNASTICS, label="Allenamento"),
             ],
             bgcolor="#1e293b", indicator_color=ft.Colors.BLUE_600, 
-            selected_index=0, # Manteniamo evidenziato Schede
+            selected_index=0, # schede evidenziato
             on_change=lambda e: [
                 page.client_storage.remove("scheda_edit"), 
                 page.go("/schede") if e.control.selected_index==0 else 
