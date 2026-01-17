@@ -2,3 +2,5 @@
 /config.py
 /build
 /venv
+/services/__pycache__
+/pages/__pycache__
