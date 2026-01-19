@@ -37,7 +37,8 @@ L’app è stata sviluppata con il framework **Flet**  (v0.25.0 basato su Flutte
 
 #### Esecuzione
 Per avviare l'applicazione tramite emulatore built-in di Flet basta eseguire il main.py
-bash```
+
+bash ```
     python main.py
     ```
 
