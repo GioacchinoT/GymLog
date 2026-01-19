@@ -27,14 +27,6 @@ Il backend è interamente ospitato su Microsoft Azure:
 
 ## Guida all'utilizzo
 
-### Backend Azure
-
-### Prerequisiti
-* Azure Subscription attiva
-* Azure CLI (`az`)
-* Python 3.10+
-* Azure Functions Core Tools v4 (`func`)
-
 ### GymLog App (Client Flet)
 
 L’app è stata sviluppata con il framework **Flet**  (v0.25.0 basato su Flutter) che permette di creare interfacce native partendo da codice Python. Può essere eseguita su Android, Web e Desktop.
@@ -45,7 +37,7 @@ L’app è stata sviluppata con il framework **Flet**  (v0.25.0 basato su Flutte
 
 #### Esecuzione
 Per avviare l'applicazione tramite emulatore built-in di Flet basta eseguire il main.py
-```bash
+bash```
     python main.py
     ```
 
