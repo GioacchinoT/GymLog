@@ -2,7 +2,7 @@ Progetto sviluppato per il corso di Cloud Computing dell’Università degli Stu
 
 # GymLog
 
-**GymLog** è un’app cross-platform (Android/iOS) sviluppata in Python (Flet) per digitalizzare, gestire e monitorare i propri allenamenti in palestra, sfruttando un'architettura interamente Serverless e funzionalità di Intelligenza Artificiale Generativa.
+**GymLog** è un’Android app sviluppata in Python (Flet) per digitalizzare, gestire e monitorare i propri allenamenti in palestra.
 
 Le funzionalità principali dell'app includono:
 
@@ -23,6 +23,8 @@ Il backend è interamente ospitato su Microsoft Azure:
 * **Azure Key Vault:** garantisce la sicurezza gestendo centralmente segreti, API Key ed Endpoint.
 * **Azure Application Insights:** per il monitoraggio, logging distribuito e analisi delle performance.
 
+## Architettura
+![](Architettura.png)
 
 
 ## Guida all'utilizzo
