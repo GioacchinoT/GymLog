@@ -30,15 +30,15 @@ def main(page: ft.Page):
         elif page.route == "/welcome":
             page.views.append(onboarding_view(page))
         
-        # Rotta Dashboard Schede (Quella visuale)
+        # Rotta Dashboard Schede 
         elif page.route == "/schede":
             page.views.append(schede_view(page))
             
-        # Rotta Form Creazione (Quella funzionale)
+        # Rotta Form Creazione 
         elif page.route == "/crea_scheda":
             page.views.append(create_routine_view(page))
 
-        # Rotta dettaglio scheda (Quella funzionale)
+        # Rotta dettaglio scheda 
         elif page.route == "/dettaglio":
             page.views.append(dettaglio_view(page))
 
