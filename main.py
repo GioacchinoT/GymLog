@@ -1,8 +1,8 @@
 import flet as ft
 from pages.home import home_view
 from pages.onboarding import onboarding_view
-from pages.schede import schede_view          # <--- NUOVO IMPORT (Dashboard)
-from pages.crea_scheda import create_routine_view # <--- VECCHIO IMPORT (Form)
+from pages.schede import schede_view          
+from pages.crea_scheda import create_routine_view 
 from pages.dettaglio_scheda import dettaglio_view
 from pages.generatore_schede_ai import generator_view
 from pages.storico_allenamento import workout_view
