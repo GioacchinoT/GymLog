@@ -1,4 +1,4 @@
-# Progetto sviluppato per il corso di Cloud Computing dell’Università degli Studi di Salerno.
+Progetto sviluppato per il corso di Cloud Computing dell’Università degli Studi di Salerno.
 
 # GymLog
 
@@ -6,10 +6,10 @@
 
 Le funzionalità principali dell'app includono:
 
-* **Smart Scan (OCR AI):** Tramite la fotocamera è possibile scansionare schede cartacee esistenti. Il sistema utilizza l'AI per riconoscere la struttura tabellare (griglie, righe, colonne) e convertire la foto in una scheda digitale modificabile.
-* **AI Coach:** Un personal trainer virtuale basato su LLM. L'utente può descrivere i propri obiettivi (es. "Voglio aumentare la forza su panca piana") e l'AI genererà automaticamente una scheda di allenamento strutturata e pronta all'uso.
-* **Live Tracking:** Logging in tempo reale di serie, ripetizioni e carichi durante l'esecuzione degli esercizi, con salvataggio immediato sul cloud.
-* **Gestione Utente & Dashboard:** Login sicuro tramite account Microsoft e dashboard per il monitoraggio dei dati biometrici (Peso, Altezza, BMI, BMR).
+* **Gestione Utente & Dashboard:** Login sicuro tramite Microsoft Account (Entra ID). Gestione dati fisici con calcolo automatico di BMI e BMR direttamente nella Dashboard.
+* **Gestione Schede:** CRUD completo (Inserimento, Modifica, Consultazione, Eliminazione) delle schede di allenamento. Gestione database esercizi personali e di sistema (Inserimento/Eliminazione).
+* **Scanner e Coach AI:** Digitalizzazione di schede cartacee tramite foto (OCR Strutturato) e generazione automatica di nuove programmazioni basate su prompt utente tramite AI (GPT-4o Mini).
+* **Live Tracking & Storico:** Logging in tempo reale di serie, ripetizioni e carichi durante l'esecuzione della scheda. Consultazione cronologica dello storico allenamenti e dei log registrati.
 
 ## Servizi Utilizzati
 
